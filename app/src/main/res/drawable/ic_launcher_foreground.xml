@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Provisional icon: three LED segments in a row, one colour each, like countdowns handing over
-     to one another (amber, ice blue, aqua). Inside the visible area of the adaptive icon (18-90). -->
+<!-- Icon: the seek bar of the title screen, four coloured countdowns and the head that chooses
+     where the work starts. Inside the visible area of the adaptive icon (18-90). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#F2A541" android:pathData="M24,54 L29,48 L41,48 L46,54 L41,60 L29,60 Z" />
-    <path android:fillColor="#6FB7FF" android:pathData="M43,54 L48,48 L60,48 L65,54 L60,60 L48,60 Z" />
-    <path android:fillColor="#9FE3D6" android:pathData="M62,54 L67,48 L79,48 L84,54 L79,60 L67,60 Z" />
+    <path android:fillColor="#F2A541" android:pathData="M28,47 L36,47 A2,2 0 0,1 38,49 L38,59 A2,2 0 0,1 36,61 L28,61 A2,2 0 0,1 26,59 L26,49 A2,2 0 0,1 28,47 Z" />
+    <path android:fillColor="#6FB7FF" android:pathData="M42,47 L47,47 A2,2 0 0,1 49,49 L49,59 A2,2 0 0,1 47,61 L42,61 A2,2 0 0,1 40,59 L40,49 A2,2 0 0,1 42,47 Z" />
+    <path android:fillColor="#9FE3D6" android:pathData="M53,47 L66,47 A2,2 0 0,1 68,49 L68,59 A2,2 0 0,1 66,61 L53,61 A2,2 0 0,1 51,59 L51,49 A2,2 0 0,1 53,47 Z" />
+    <path android:fillColor="#4CFF7A" android:pathData="M72,47 L80,47 A2,2 0 0,1 82,49 L82,59 A2,2 0 0,1 80,61 L72,61 A2,2 0 0,1 70,59 L70,49 A2,2 0 0,1 72,47 Z" />
+    <path android:fillColor="#F3EFE6" android:pathData="M59,39 L59,39 A2,2 0 0,1 61,41 L61,67 A2,2 0 0,1 59,69 L59,69 A2,2 0 0,1 57,67 L57,41 A2,2 0 0,1 59,39 Z" />
 </vector>

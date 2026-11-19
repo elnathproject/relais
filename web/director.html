@@ -1,0 +1,216 @@
+<!doctype html>
+<!--
+  Relais for ensembles: the conductor's page.
+  Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
+  Released under the MIT License: see the LICENSE file.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f10">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<title>Relais · conductor</title>
+<style>
+:root {
+  --bg:#0d0f10; --panel:#171a1c; --line:#2a2f32; --fg:#d9dedf; --muted:#7d8789;
+  --accent:#f2a541; --accent-ink:#1a1205; --run:#9fe3d6;
+  --seg-bg:#0d0f10; --seg-fg:#f2a541; --seg-ink:#d9dedf;
+  --font-digits:ui-monospace,"SFMono-Regular","Roboto Mono",Menlo,monospace;
+  --font-ui:"Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+* { box-sizing:border-box; }
+html, body { height:100%; margin:0; }
+body { background:var(--bg); color:var(--fg); font-family:var(--font-ui); display:flex; flex-direction:column;
+  padding:10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); overflow:hidden;
+  -webkit-user-select:none; user-select:none; }
+[hidden] { display:none !important; }
+button { cursor:pointer; font-family:var(--font-ui); }
+button:disabled { opacity:.35; cursor:default; }
+button:focus-visible, input:focus-visible { outline:2px solid var(--fg); outline-offset:2px; }
+.top { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; flex:none; }
+.phase { font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
+.phase span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.phase i { width:9px; height:9px; border-radius:50%; background:var(--seg-fg); flex:none; }
+.tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.online { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.iconbtn { background:none; border:1px solid var(--line); color:var(--muted); font:600 12px var(--font-ui); letter-spacing:.08em;
+  text-transform:uppercase; padding:7px 10px; border-radius:6px; }
+.warn { background:#3a1414; border:1px solid #7a2a2a; color:#f2c4c4; border-radius:8px; padding:8px 12px; font-size:14px; margin-top:8px; }
+.btn { background:none; border:1px solid var(--line); color:var(--fg); font:600 13px var(--font-ui); letter-spacing:.1em;
+  text-transform:uppercase; padding:9px 14px; border-radius:8px; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border:none; }
+.mini { background:none; border:1px solid var(--line); color:var(--muted); width:36px; height:36px; border-radius:8px; font:400 16px var(--font-ui); padding:0; flex:none; }
+.mini.go { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-size:14px; }
+.small { font-size:13px; color:var(--muted); }
+
+/* ---- worklists ---- */
+#lib { flex:1; min-height:0; overflow-y:auto; padding:14px 0 10px; }
+.libhead { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.wl { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:14px; max-width:720px; }
+.wlhead { display:flex; align-items:center; gap:10px; }
+.wlhead .nm { flex:1; min-width:0; font:600 15px var(--font-ui); letter-spacing:.1em; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wlhead .btn { height:36px; padding:0 12px; }
+.works { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.work { display:flex; align-items:center; gap:8px; }
+.workbody { flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:9px 11px; display:flex; flex-direction:column; gap:6px; }
+.workbody.loaded { border-color:var(--accent); }
+.row1 { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.wname { font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.total, .durs { font:13px var(--font-digits); color:var(--muted); }
+.durs { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.strip { display:flex; height:12px; border-radius:4px; overflow:hidden; gap:2px; }
+.strip span { min-width:3px; }
+.empty { color:var(--muted); font-size:15px; line-height:1.5; max-width:40em; }
+
+/* ---- player: the same screens as the app ---- */
+#player { flex:1; min-height:0; display:flex; flex-direction:column; margin-top:8px; border-radius:12px; padding:10px;
+  background:var(--seg-bg); color:var(--seg-ink); transition:background .15s; }
+.fit { flex:1; min-height:0; position:relative; }
+#digits { position:absolute; inset:0; width:100%; height:100%; display:block; }
+body.paused #digits, body.waiting #digits { opacity:.45; }
+#ttlBox { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+#ttl { font:600 40px system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--seg-fg); text-align:center;
+  line-height:1.1; width:96%; overflow-wrap:normal; word-break:normal; }
+#ttl.blink { animation:tblink .32s steps(1, end) 5; }
+@keyframes tblink { 0% { opacity:0; } 50% { opacity:1; } }
+body[data-kind="end"] #ttl, body[data-kind="idle"] #ttl { color:var(--seg-ink); opacity:.55; }
+body[data-kind="title"] #digits, body[data-kind="next"] #digits, body[data-kind="end"] #digits, body[data-kind="idle"] #digits { display:none; }
+body[data-kind="run"] #ttlBox, body[data-kind="done"] #ttlBox { display:none; }
+#info { width:100%; max-width:640px; margin:0 auto; }
+body:not([data-kind="title"]):not([data-kind="next"]) #info { display:none; }
+.scrub { position:relative; padding:10px 0; touch-action:none; cursor:pointer; }
+.scrub .strip { height:22px; box-shadow:0 0 0 1px color-mix(in srgb, var(--seg-ink) 25%, transparent); }
+.past { position:absolute; left:0; top:10px; height:22px; width:0; background:rgba(0,0,0,.5); border-radius:4px 0 0 4px; pointer-events:none; }
+.head { position:absolute; top:4px; bottom:4px; left:0; width:4px; margin-left:-2px; border-radius:2px; background:var(--seg-ink); pointer-events:none;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--seg-bg) 70%, transparent); }
+.seekrow { display:flex; align-items:center; justify-content:center; gap:8px; }
+.seekrow .mini { color:var(--seg-ink); border-color:color-mix(in srgb, var(--seg-ink) 30%, transparent); }
+#seekPos { font:13px var(--font-digits); flex:1; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#plDurs { font:13px var(--font-digits); opacity:.7; text-align:center; padding-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.controls { display:grid; grid-template-columns:1fr 2fr; gap:10px; padding-top:10px; flex:none; }
+body[data-kind="title"] .controls, body[data-kind="next"] .controls { grid-template-columns:1fr 2fr 1fr; }
+body:not([data-kind="title"]):not([data-kind="next"]) #nextWork { display:none; }
+.controls button { height:58px; border-radius:10px; font:600 17px var(--font-ui); letter-spacing:.1em; text-transform:uppercase; }
+#reset, #nextWork { background:color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border:1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color:var(--seg-ink); }
+#main { background:var(--seg-fg); border:none; color:var(--seg-bg); }
+body.paused #main { background:var(--seg-ink); color:var(--seg-bg); }
+.hint { text-align:center; font-size:12px; color:var(--muted); padding-top:8px; flex:none; }
+
+/* ---- dialogs ---- */
+.dialog { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; padding:16px;
+  background:color-mix(in srgb, var(--bg) 88%, transparent); }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px; max-width:400px; width:100%;
+  display:flex; flex-direction:column; gap:14px; max-height:100%; overflow-y:auto; }
+.card h2 { margin:0; font:600 30px system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--accent); }
+.card h3 { margin:0; font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.card p { margin:0; font-size:14px; line-height:1.5; }
+.card input[type=password] { width:100%; font-size:20px; padding:12px 14px; background:#111; border:1px solid #333; color:var(--fg); border-radius:8px; -webkit-user-select:text; user-select:text; }
+.card .row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.card .err { color:#e66; }
+.card #loginMsg { min-height:1em; }
+.qrcard { background:#fff; color:#111; border-radius:14px; padding:18px; display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; max-width:96vw; }
+.qrcard canvas { display:block; }
+.qraddr { font:15px var(--font-digits); word-break:break-all; text-align:center; -webkit-user-select:text; user-select:text; }
+.qrhint { font-size:12px; color:#666; text-align:center; }
+.addr { font:13px var(--font-digits); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; word-break:break-all;
+  -webkit-user-select:text; user-select:text; }
+label.check { display:flex; align-items:center; gap:10px; font-size:14px; }
+label.check input { width:20px; height:20px; accent-color:var(--accent); }
+.toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:30; background:var(--fg); color:var(--bg);
+  padding:10px 16px; border-radius:8px; font-size:14px; max-width:90vw; text-align:center; }
+@media (orientation: landscape) and (max-height:520px) { .controls button { height:46px; } }
+</style>
+</head>
+<body data-kind="idle">
+
+<div class="top">
+  <div class="phase"><i></i><span id="label">Worklists</span></div>
+  <div class="tools">
+    <span class="online" id="online"></span>
+    <button class="iconbtn" id="viewBtn">Worklists</button>
+    <button class="iconbtn" id="qrBtn" title="Show the performers' address as a QR code to scan">QR code</button>
+    <button class="iconbtn" id="prefsBtn">Settings</button>
+    <button class="iconbtn" id="logout">Log out</button>
+  </div>
+</div>
+<div id="warnings"></div>
+
+<!-- worklists, from a file exported by the Relais app -->
+<div id="lib">
+  <div class="libhead">
+    <button class="btn" id="importBtn">Import worklists</button>
+    <span class="small" id="libNote"></span>
+  </div>
+  <div id="libList"></div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+</div>
+
+<!-- player: what the performers see, plus the controls -->
+<div id="player" hidden>
+  <div class="fit" id="fit">
+    <canvas id="digits" role="img" aria-label="00:00"></canvas>
+    <div id="ttlBox"><div id="ttl" role="heading" aria-level="1"></div></div>
+  </div>
+  <div id="info">
+    <div class="scrub" id="scrub" role="slider" aria-label="Start position" aria-valuemin="0">
+      <div class="strip" id="plStrip"></div><div class="past" id="past"></div><div class="head" id="head"></div>
+    </div>
+    <div class="seekrow">
+      <button class="mini" id="seekHome" aria-label="Back to the beginning">⏮</button>
+      <button class="mini" id="seekMinus" aria-label="One second earlier">−</button>
+      <span id="seekPos"></span>
+      <button class="mini" id="seekPlus" aria-label="One second later">+</button>
+    </div>
+    <div id="plDurs"></div>
+  </div>
+  <div class="controls">
+    <button id="reset">Reset</button>
+    <button id="main">Start</button>
+    <button id="nextWork">Next ›</button>
+  </div>
+</div>
+<div class="hint" id="hint">Commands reach every display together, about one second after you press. Pedal or keyboard: on a title, → ↓ Page Down Space Enter = Start; on a countdown, the same keys = Pause / Resume, ← ↑ Page Up = Reset to the title.</div>
+
+<div class="dialog" id="login" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <form class="card" id="loginForm" autocomplete="off">
+    <h2 id="loginTitle">Relais</h2>
+    <p>Conductor's page. Logging in opens the timer for the performers, at the address shown in Settings and as a QR code.</p>
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
+    <label class="check"><input type="checkbox" id="remember"> Remember on this computer</label>
+    <p class="err" id="httpWarn"></p>
+    <p class="err" id="loginMsg"></p>
+    <div class="row"><span></span><button class="btn primary" type="submit">Enter</button></div>
+  </form>
+</div>
+
+<div class="dialog" id="prefs" hidden role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+  <div class="card">
+    <h2 id="prefsTitle">Settings</h2>
+    <h3>Address for the performers</h3>
+    <div class="addr" id="addr"></div>
+    <div class="row"><span class="small" id="addrNote"></span><button class="btn" id="copy">Copy</button></div>
+    <p class="small" id="openNote"></p>
+    <label class="check"><input type="checkbox" id="vibrate"> Vibrate the performers' phones at each change</label>
+    <p class="small">Vibration works on Android phones in Chrome and similar browsers, not on iPhone.</p>
+    <div class="row"><button class="btn" id="clearBtn" title="The displays go back to the waiting screen">Clear the displays</button><button class="btn" id="prefsClose">Close</button></div>
+  </div>
+</div>
+
+<div class="dialog" id="qr" hidden role="dialog" aria-modal="true" aria-label="QR code of the address for the performers">
+  <div class="qrcard">
+    <canvas id="qrCanvas"></canvas>
+    <div class="qraddr" id="qrAddr"></div>
+    <div class="qrhint">Scan with the phone's camera to open the timer · click or Esc to close</div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="timer.js"></script>
+<script src="qrcode.js"></script>
+<script src="director.js"></script>
+</body>
+</html>

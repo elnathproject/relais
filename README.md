@@ -34,6 +34,10 @@ From left: the worklists; editing a work; the title of a work, waiting for the p
 
 Time is always computed from the system clock rather than by counting ticks, so it stays accurate even if the phone slows the app down.
 
+## For ensembles: web version
+
+The `web/` folder holds a web version for a group of musicians: a conductor plays the worklists exported from the app on a password-protected page, and the performers follow the same screens full screen on their phones or tablets, by opening an address or scanning a QR code, with no app to install. All displays change countdown together. It runs on ordinary PHP web hosting; see [web/README.md](web/README.md).
+
 ## Exchange file
 
 ```json
@@ -70,10 +74,10 @@ To update, install the new APK over the old one. If Android refuses because the 
 - `app/src/main/java/com/ciccarelli/relais/MainActivity.kt`: the Android window that hosts the page full screen, keeps the screen on, handles vibration, the back button and the system file picker for import and export, and opens external links in the browser.
 - `app/src/main/AndroidManifest.xml`: name, icon, automatic rotation and permissions (vibration only).
 - `.github/workflows/build.yml`: the automatic build on GitHub.
+- `web/`: the web version for ensembles (conductor and displays), described in its own README.
 - `docs/screenshots/`: the images of this page.
 - `LICENSE`: the MIT License.
 
-A web version for ensembles, with a conductor controlling the timer and the performers following it on their own devices, is planned, on the model of Élan's.
 
 ## Credits
 

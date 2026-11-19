@@ -6,3 +6,6 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+
+# Relais for ensembles: runtime data of the server
+web/data/*.json

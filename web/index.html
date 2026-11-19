@@ -1,0 +1,93 @@
+<!doctype html>
+<!--
+  Relais for ensembles: the display seen by the performers.
+  Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
+  Released under the MIT License: see the LICENSE file.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0d0f10">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<title>Relais</title>
+<style>
+  :root { --bg:#0d0f10; --fg:#d9dedf; --muted:#7d8789; --line:#2a2f32; --accent:#f2a541;
+          --seg-bg:#0d0f10; --seg-fg:#f2a541; --seg-ink:#d9dedf; color-scheme:dark; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family:"Roboto Condensed","Arial Narrow",system-ui,sans-serif; -webkit-user-select:none; user-select:none; }
+  #stage { position:fixed; inset:0; display:flex; flex-direction:column; background:var(--seg-bg); color:var(--seg-ink);
+    padding:max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  #bar { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    color:color-mix(in srgb, var(--seg-ink) 65%, transparent); min-height:18px; }
+  #bar span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #dot { width:9px; height:9px; border-radius:50%; background:#c33; flex:none; }
+  #dot.on { background:#3c6; }
+  #fit { flex:1; min-height:0; position:relative; }
+  #digits { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  body.paused #digits, body.waiting #digits { opacity:.45; }
+  /* title of the work, upright sans serif: from a distance it reads better than an italic */
+  #ttlBox { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  #ttl { font:600 40px system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--seg-fg); text-align:center;
+    line-height:1.1; width:96%; overflow-wrap:normal; word-break:normal; }
+  #ttl.blink { animation:tblink .32s steps(1, end) 5; }
+  @keyframes tblink { 0% { opacity:0; } 50% { opacity:1; } }
+  body[data-kind="end"] #ttl, body[data-kind="idle"] #ttl { color:var(--seg-ink); opacity:.55; }
+  /* the seek bar, read only: where the conductor will start the work from */
+  #info { padding-top:8px; }
+  .scrub { position:relative; padding:8px 0; }
+  .strip { display:flex; height:16px; border-radius:4px; overflow:hidden; gap:2px; box-shadow:0 0 0 1px color-mix(in srgb, var(--seg-ink) 25%, transparent); }
+  .strip span { min-width:3px; }
+  .past { position:absolute; left:0; top:8px; height:16px; width:0; background:rgba(0,0,0,.5); border-radius:4px 0 0 4px; }
+  .head { position:absolute; top:3px; bottom:3px; left:0; width:4px; margin-left:-2px; border-radius:2px; background:var(--seg-ink); }
+  #pos { text-align:center; font:13px ui-monospace,"Roboto Mono",Menlo,monospace; opacity:.75; padding-top:4px; }
+  body:not([data-kind="title"]):not([data-kind="next"]) #info { display:none; }
+  body[data-kind="title"] #digits, body[data-kind="next"] #digits, body[data-kind="end"] #digits, body[data-kind="idle"] #digits { display:none; }
+  body[data-kind="run"] #ttlBox, body[data-kind="done"] #ttlBox { display:none; }
+  /* first screen: one tap allows full screen, screen kept on and vibration */
+  #gate { position:fixed; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    background:var(--bg); text-align:center; padding:24px; cursor:pointer; }
+  #closed { position:fixed; inset:0; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    background:var(--bg); text-align:center; padding:24px; }
+  #closed h1, #gate h1 { font:600 52px system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  #closed h1 { color:var(--muted); }
+  #closed p { font-size:15px; line-height:1.5; color:var(--muted); max-width:30em; }
+  #gate h1 { color:var(--accent); }
+  #gate p { font-size:15px; line-height:1.5; color:var(--fg); max-width:30em; }
+  #gate .tap { font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); border:1px solid var(--line); border-radius:10px; padding:14px 22px; }
+  #gate .err { color:#e66; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body data-kind="idle">
+
+<div id="gate">
+  <h1>Relais</h1>
+  <p id="gateMsg">The conductor controls this timer.</p>
+  <div class="tap" id="gateTap">Tap to show the timer</div>
+</div>
+
+<div id="closed" hidden>
+  <h1>Relais</h1>
+  <p>The timer is not open yet.<br>It appears here by itself when the conductor opens it.</p>
+</div>
+
+<div id="stage">
+  <div id="bar"><i id="dot"></i><span id="label">Waiting for the conductor</span></div>
+  <div id="fit">
+    <canvas id="digits" role="img" aria-label="00:00"></canvas>
+    <div id="ttlBox"><div id="ttl" role="heading" aria-level="1"></div></div>
+  </div>
+  <div id="info">
+    <div class="scrub" id="scrub"><div class="strip" id="strip"></div><div class="past" id="past"></div><div class="head" id="head"></div></div>
+    <div id="pos"></div>
+  </div>
+</div>
+
+<script src="timer.js"></script>
+<script src="display.js"></script>
+</body>
+</html>
