@@ -92,25 +92,25 @@
     try { await api(a, extra); } catch (e) {} finally { busy = false; }
   }
 
-  // ---- worklists: imported from a file exported by the Relais app, kept in this browser ----
+  // ---- setlists: imported from a file exported by the Relais app, kept in this browser ----
   const HEX = /^#[0-9a-f]{6}$/i, MAX_S = 999 * 60 + 59;
-  const cleanWork = w => {
+  const cleanPiece = w => {
     if (!w || typeof w !== 'object' || !Array.isArray(w.segments)) return null;
     const segs = w.segments.slice(0, 99).filter(s => s && HEX.test(s.bg) && HEX.test(s.fg) && isFinite(+s.s))
       .map(s => ({ s: Math.max(1, Math.min(MAX_S, Math.round(+s.s))), bg: s.bg.toLowerCase(), fg: s.fg.toLowerCase() }));
     return segs.length ? { name: String(w.name ?? '').slice(0, 60), segments: segs } : null;
   };
   const cleanLib = x => {
-    const wls = x && Array.isArray(x.worklists) ? x.worklists : null;
+    const wls = x && Array.isArray(x.setlists) ? x.setlists : null;
     if (!wls) return null;
-    return { worklists: wls.filter(l => l && typeof l === 'object').map(l => ({ name: String(l.name ?? '').slice(0, 60),
-             works: (Array.isArray(l.works) ? l.works : []).map(cleanWork).filter(Boolean) })) };
+    return { setlists: wls.filter(l => l && typeof l === 'object').map(l => ({ name: String(l.name ?? '').slice(0, 60),
+             pieces: (Array.isArray(l.pieces) ? l.pieces : []).map(cleanPiece).filter(Boolean) })) };
   };
   let lib = null;
   try { lib = cleanLib(JSON.parse(localStorage.getItem('relais.web.library') || 'null')); } catch (e) {}
-  if (!lib) lib = { worklists: [] };
+  if (!lib) lib = { setlists: [] };
   const saveLib = () => { try { localStorage.setItem('relais.web.library', JSON.stringify(lib)); } catch (e) {} };
-  // what this page loaded last: worklist index, work index, played as a worklist
+  // what this page loaded last: setlist index, piece index, played as a setlist
   let cur = null;
   try { cur = JSON.parse(sessionStorage.getItem('relais.cur') || 'null'); } catch (e) {}
   const saveCur = () => { try { sessionStorage.setItem('relais.cur', JSON.stringify(cur)); } catch (e) {} };
@@ -118,28 +118,28 @@
 
   function renderLib() {
     const box = $('libList'); box.textContent = '';
-    $('libNote').textContent = lib.worklists.length ? 'Importing replaces the worklists below.' : '';
-    if (!lib.worklists.length) {
-      box.append(h('p', { className: 'empty', textContent: 'No worklists yet. In the Relais app, tap Export at the top of the worklists, then import that file here. The worklists stay in this browser.' }));
+    $('libNote').textContent = lib.setlists.length ? 'Importing replaces the setlists below.' : '';
+    if (!lib.setlists.length) {
+      box.append(h('p', { className: 'empty', textContent: 'No setlists yet. In the Relais app, tap Export at the top of the setlists, then import that file here. The setlists stay in this browser.' }));
       return;
     }
-    lib.worklists.forEach((l, li) => {
-      const works = h('div', { className: 'works' });
-      if (!l.works.length) works.append(h('div', { className: 'small', textContent: 'No works.' }));
-      l.works.forEach((w, wi) => {
+    lib.setlists.forEach((l, li) => {
+      const pieces = h('div', { className: 'pieces' });
+      if (!l.pieces.length) pieces.append(h('div', { className: 'small', textContent: 'No pieces.' }));
+      l.pieces.forEach((w, wi) => {
         const st = h('div', { className: 'strip' }); Relais.strip(st, w);
-        const loaded = cur && cur.li === li && cur.i === wi && S && S.mode !== 'idle' && S.work && S.work.name === w.name;
-        works.append(h('div', { className: 'work' },
-          h('div', { className: 'workbody' + (loaded ? ' loaded' : '') },
+        const loaded = cur && cur.li === li && cur.i === wi && S && S.mode !== 'idle' && S.piece && S.piece.name === w.name;
+        pieces.append(h('div', { className: 'piece' },
+          h('div', { className: 'piecebody' + (loaded ? ' loaded' : '') },
             h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: Relais.fmtDur(total(w)) })),
             st, h('div', { className: 'durs', textContent: w.segments.map(s => Relais.fmtDur(s.s)).join(' · ') })),
-          h('button', { className: 'mini go', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => { loadWork(li, wi, false); showView('player'); } })));
+          h('button', { className: 'mini go', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => { loadPiece(li, wi, false); showView('player'); } })));
       });
-      box.append(h('div', { className: 'wl' },
-        h('div', { className: 'wlhead' }, h('span', { className: 'nm', textContent: l.name }),
-          h('button', { className: 'btn primary', textContent: '▶ Start', disabled: !l.works.length, ariaLabel: `Start the worklist ${l.name}`,
-                        onclick: () => { loadWork(li, 0, true); showView('player'); } })),
-        works));
+      box.append(h('div', { className: 'sl' },
+        h('div', { className: 'slhead' }, h('span', { className: 'nm', textContent: l.name }),
+          h('button', { className: 'btn primary', textContent: '▶ Start', disabled: !l.pieces.length, ariaLabel: `Start the setlist ${l.name}`,
+                        onclick: () => { loadPiece(li, 0, true); showView('player'); } })),
+        pieces));
     });
   }
   $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -149,29 +149,29 @@
     if (f.size > 1e6) { toast('File too large.'); return; }
     f.text().then(text => {
       let x = null; try { x = cleanLib(JSON.parse(text)); } catch (err) {}
-      if (!x || !x.worklists.length) { toast('This file holds no worklists.'); return; }
+      if (!x || !x.setlists.length) { toast('This file holds no setlists.'); return; }
       lib = x; cur = null; saveLib(); saveCur(); renderLib();
-      toast(`Imported ${x.worklists.length} worklist${x.worklists.length > 1 ? 's' : ''}.`);
+      toast(`Imported ${x.setlists.length} setlist${x.setlists.length > 1 ? 's' : ''}.`);
     });
   });
 
-  // a work becomes the current one on every display, on its title
-  function loadWork(li, i, list, opts = {}) {
-    const l = lib.worklists[li]; if (!l || !l.works[i]) return;
+  // a piece becomes the current one on every display, on its title
+  function loadPiece(li, i, list, opts = {}) {
+    const l = lib.setlists[li]; if (!l || !l.pieces[i]) return;
     cur = { li, i, list }; saveCur(); pendingSeek = null; clearTimeout(seekTimer);
-    send('load', { work: l.works[i], next: list ? (l.works[i + 1] || null) : null, list, wl: l.name,
-                   pos: list ? i : 0, count: list ? l.works.length : 1, seek: opts.seek || 0, start: !!opts.start });
+    send('load', { piece: l.pieces[i], next: list ? (l.pieces[i + 1] || null) : null, list, setlist: l.name,
+                   pos: list ? i : 0, count: list ? l.pieces.length : 1, seek: opts.seek || 0, start: !!opts.start });
   }
-  // this page knows the worklist on the displays (for Prev, Next and the following works) only if it loaded it
-  const mine = () => cur && S && S.work && lib.worklists[cur.li] && lib.worklists[cur.li].name === S.wl
+  // this page knows the setlist on the displays (for Prev, Next and the following pieces) only if it loaded it
+  const mine = () => cur && S && S.piece && lib.setlists[cur.li] && lib.setlists[cur.li].name === S.setlist
                      && (cur.list ? S.list && S.pos === cur.i : !S.list);
 
-  // ---- views: worklists or player ----
+  // ---- views: setlists or player ----
   let view = 'lib';
   function showView(v) {
     view = v;
     $('lib').hidden = v !== 'lib'; $('player').hidden = v !== 'player';
-    $('viewBtn').textContent = v === 'lib' ? 'Player' : 'Worklists';
+    $('viewBtn').textContent = v === 'lib' ? 'Player' : 'Setlists';
     if (v === 'lib') renderLib();
     else { fitAll(); }
   }
@@ -182,32 +182,32 @@
     if (!S) return;
     const v = Relais.view(S);
     if (v.kind === 'title') {
-      // a start position still on its way goes first, so the work starts from it
+      // a start position still on its way goes first, so the piece starts from it
       if (pendingSeek !== null) { clearTimeout(seekTimer); const ms = pendingSeek; await send('seek', { ms }); if (pendingSeek === ms) pendingSeek = null; }
       send('start');
     }
-    else if (v.kind === 'next') { if (mine()) loadWork(cur.li, cur.i + 1, true, { start: true }); }
+    else if (v.kind === 'next') { if (mine()) loadPiece(cur.li, cur.i + 1, true, { start: true }); }
     else if (v.kind === 'run') send(S.until !== null ? 'resume' : 'pause');
-    // single work over, end of the worklist, nothing loaded: forward does nothing
+    // single piece over, end of the setlist, nothing loaded: forward does nothing
   }
-  // the left pedal: nothing on a title (a stray press on stage must not change the work)
+  // the left pedal: nothing on a title (a stray press on stage must not change the piece)
   function backAction() {
     if (!S) return;
     const v = Relais.view(S);
     if (v.kind === 'run' || v.kind === 'done') send('reset');                       // back to the title, same start position
-    else if (v.kind === 'end' && mine()) loadWork(cur.li, lib.worklists[cur.li].works.length - 1, true); // last work
+    else if (v.kind === 'end' && mine()) loadPiece(cur.li, lib.setlists[cur.li].pieces.length - 1, true); // last piece
   }
   function backButton() {
     const v = S ? Relais.view(S) : null;
-    if (v && v.kind === 'title') { if (mine() && cur.list && cur.i > 0) loadWork(cur.li, cur.i - 1, true); }
+    if (v && v.kind === 'title') { if (mine() && cur.list && cur.i > 0) loadPiece(cur.li, cur.i - 1, true); }
     else backAction();
   }
   mainB.addEventListener('click', mainAction);
   $('reset').addEventListener('click', backButton);
-  $('nextWork').addEventListener('click', () => {
+  $('nextPiece').addEventListener('click', () => {
     const v = S ? Relais.view(S) : null;
     if (!v || !mine() || !cur.list) return;
-    if (v.kind === 'title' && cur.i + 1 < lib.worklists[cur.li].works.length) loadWork(cur.li, cur.i + 1, true);
+    if (v.kind === 'title' && cur.i + 1 < lib.setlists[cur.li].pieces.length) loadPiece(cur.li, cur.i + 1, true);
   });
 
   // Bluetooth page-turner pedal or keyboard, as in the app
@@ -230,7 +230,7 @@
   let seekTimer = 0;
   function setSeek(ms) {
     if (!S || S.mode !== 'title') return;
-    const tot = Relais.cums(S.work).at(-1);
+    const tot = Relais.cums(S.piece).at(-1);
     S.seek = pendingSeek = Math.max(0, Math.min(tot - 1000, Math.round(ms / 1000) * 1000));
     seekKey = ''; // redraw the bar
     clearTimeout(seekTimer);
@@ -242,9 +242,9 @@
   }
   $('scrub').addEventListener('pointerdown', e => {
     if (!S || S.mode !== 'title') return;
-    $('scrub').setPointerCapture(e.pointerId); setSeek(Relais.seekFromX($('plStrip'), S.work, e.clientX));
+    $('scrub').setPointerCapture(e.pointerId); setSeek(Relais.seekFromX($('plStrip'), S.piece, e.clientX));
   });
-  $('scrub').addEventListener('pointermove', e => { if ($('scrub').hasPointerCapture(e.pointerId) && S && S.mode === 'title') setSeek(Relais.seekFromX($('plStrip'), S.work, e.clientX)); });
+  $('scrub').addEventListener('pointermove', e => { if ($('scrub').hasPointerCapture(e.pointerId) && S && S.mode === 'title') setSeek(Relais.seekFromX($('plStrip'), S.piece, e.clientX)); });
   function stepper(btn, d) { // one second per tap; held down, it repeats
     let t = 0, iv = 0;
     const stop = () => { clearTimeout(t); clearInterval(iv); };
@@ -324,7 +324,7 @@
   function fitAll() {
     Relais.fitTitle($('ttl'), $('ttlBox'));
     const v = S ? Relais.view(S) : null;
-    if (v && (v.kind === 'title' || v.kind === 'next')) Relais.placeHead($('scrub'), $('plStrip'), $('head'), $('past'), v.work, v.seek);
+    if (v && (v.kind === 'title' || v.kind === 'next')) Relais.placeHead($('scrub'), $('plStrip'), $('head'), $('past'), v.piece, v.seek);
   }
   new ResizeObserver(fitAll).observe($('fit'));
   function frame() {
@@ -332,24 +332,24 @@
     body.dataset.kind = v.kind;
     body.classList.toggle('paused', !!v.paused);
     body.classList.toggle('waiting', !!v.waiting);
-    const lab = $('label'), wl = mine() ? lib.worklists[cur.li] : null;
+    const lab = $('label'), sl = mine() ? lib.setlists[cur.li] : null;
     if (v.kind === 'idle') {
-      colors('#0d0f10', '#f2a541'); setTitle('No work loaded', false);
-      lab.textContent = view === 'lib' ? 'Worklists' : 'Waiting';
+      colors('#0d0f10', '#f2a541'); setTitle('No piece loaded', false);
+      lab.textContent = view === 'lib' ? 'Setlists' : 'Waiting';
       mainB.textContent = 'Start'; mainB.disabled = true; $('reset').textContent = 'Reset'; $('reset').disabled = true;
     } else if (v.kind === 'title' || v.kind === 'next') {
       colors(v.bg, v.fg);
-      setTitle(v.work.name, v.kind === 'next' && last.kind === 'run');
+      setTitle(v.piece.name, v.kind === 'next' && last.kind === 'run');
       const pos = v.kind === 'next' ? S.pos + 1 : S.pos;
-      lab.textContent = S.list ? `${pos + 1}/${S.count} · ${S.wl}` : 'Ready';
-      const key = JSON.stringify([v.work.segments, v.seek, v.kind]);
+      lab.textContent = S.list ? `${pos + 1}/${S.count} · ${S.setlist}` : 'Ready';
+      const key = JSON.stringify([v.piece.segments, v.seek, v.kind]);
       if (key !== seekKey) {
         seekKey = key;
-        Relais.strip($('plStrip'), v.work);
-        Relais.placeHead($('scrub'), $('plStrip'), $('head'), $('past'), v.work, v.seek);
-        const c = Relais.cums(v.work), t = Relais.segIndex(c, v.seek), tot = c.at(-1);
+        Relais.strip($('plStrip'), v.piece);
+        Relais.placeHead($('scrub'), $('plStrip'), $('head'), $('past'), v.piece, v.seek);
+        const c = Relais.cums(v.piece), t = Relais.segIndex(c, v.seek), tot = c.at(-1);
         $('seekPos').textContent = v.seek ? `From ${Relais.fmtDur(v.seek / 1000)} · ${t + 1}/${v.n} · ${Relais.fmt(Math.ceil((c[t + 1] - v.seek) / 1000))} left` : 'From 0:00';
-        $('plDurs').textContent = v.work.segments.map(s => Relais.fmtDur(s.s)).join(' · ') + ' = ' + Relais.fmtDur(tot / 1000);
+        $('plDurs').textContent = v.piece.segments.map(s => Relais.fmtDur(s.s)).join(' · ') + ' = ' + Relais.fmtDur(tot / 1000);
         const editable = v.kind === 'title';
         $('seekHome').disabled = $('seekMinus').disabled = !editable || v.seek === 0;
         $('seekPlus').disabled = !editable || v.seek >= tot - 1000;
@@ -357,19 +357,19 @@
       mainB.textContent = 'Start'; mainB.disabled = v.kind === 'next' && !mine();
       $('reset').textContent = '‹ Prev';
       $('reset').disabled = !(v.kind === 'title' && mine() && cur.list && cur.i > 0);
-      $('nextWork').disabled = !(v.kind === 'title' && mine() && cur.list && wl && cur.i + 1 < wl.works.length);
-      // the work on the displays is over: this page makes the next one the current one, so that every
+      $('nextPiece').disabled = !(v.kind === 'title' && mine() && cur.list && sl && cur.i + 1 < sl.pieces.length);
+      // the piece on the displays is over: this page makes the next one the current one, so that every
       // further command (start, seek, previous) applies to it. The displays already show its title.
-      if (v.kind === 'next' && mine() && advancing !== S.rev) { advancing = S.rev; loadWork(cur.li, cur.i + 1, true); }
+      if (v.kind === 'next' && mine() && advancing !== S.rev) { advancing = S.rev; loadPiece(cur.li, cur.i + 1, true); }
     } else if (v.kind === 'end') {
       colors(v.bg, v.fg); setTitle('End', last.kind === 'run');
-      lab.textContent = `End · ${S.wl}`;
+      lab.textContent = `End · ${S.setlist}`;
       mainB.textContent = 'End'; mainB.disabled = true; $('reset').textContent = '‹ Back'; $('reset').disabled = !mine();
     } else { // run, done
       colors(v.bg, v.fg);
       Relais.draw($('digits'), $('fit'), v.text, v.fg, v.lit);
-      lab.textContent = v.kind === 'done' ? `End · ${v.work.name}` : S.until !== null ? `Paused · ${v.i + 1}/${v.n}`
-                      : v.waiting ? 'Starting…' : `${v.i + 1}/${v.n} · ${v.work.name}`;
+      lab.textContent = v.kind === 'done' ? `End · ${v.piece.name}` : S.until !== null ? `Paused · ${v.i + 1}/${v.n}`
+                      : v.waiting ? 'Starting…' : `${v.i + 1}/${v.n} · ${v.piece.name}`;
       mainB.textContent = v.kind === 'done' ? 'End' : S.until !== null ? 'Resume' : 'Pause';
       mainB.disabled = v.kind === 'done';
       $('reset').textContent = 'Reset'; $('reset').disabled = false;

@@ -84,7 +84,7 @@ const Relais = (() => {
   const cums = w => { const c = [0]; w.segments.forEach(s => c.push(c[c.length - 1] + s.s * 1000)); return c; };
   const segIndex = (c, el) => { let i = 0; while (i < c.length - 2 && el >= c[i + 1]) i++; return i; };
 
-  // ---- Seek bar: the coloured sections of a work, a head at the start position ----
+  // ---- Seek bar: the coloured sections of a piece, a head at the start position ----
   // Each section takes the digit colour of its countdown. Time and position are mapped on the
   // sections themselves, not on the whole bar, so the gaps never shift the head off the colours.
   function strip(box, w) {
@@ -119,30 +119,30 @@ const Relais = (() => {
   const now = () => Date.now() + skew; // server time
 
   // ---- State → what to show at server time t ----
-  // elapsed in the work = seek + acc + time run since `since`, stopped at `until` if paused.
-  // Kinds: idle, title (of the loaded work), run, next (title of the next work, the current one
-  // being over), done (single work over: 00:00), end (worklist over).
+  // elapsed in the piece = seek + acc + time run since `since`, stopped at `until` if paused.
+  // Kinds: idle, title (of the loaded piece), run, next (title of the next piece, the current one
+  // being over), done (single piece over: 00:00), end (setlist over).
   // Blinking in time, as in the app: for the first three seconds of a new countdown the digits are
   // lit in the first 550 ms of every second. The countdown the run starts from never blinks.
   const BLINK_BEATS = 3, BLINK_ON = 550;
   const blinkLit = since => !(since >= 0 && since < BLINK_BEATS * 1000 && since % 1000 >= BLINK_ON);
   function view(s, t = now()) {
-    if (!s || s.mode === 'idle' || !s.work) return { kind: 'idle' };
-    const w = s.work, c = cums(w), n = w.segments.length, tot = c[n];
-    if (s.mode === 'title') { const i = segIndex(c, s.seek); return { kind: 'title', work: w, seek: s.seek, i, n, bg: w.segments[i].bg, fg: w.segments[i].fg }; }
+    if (!s || s.mode === 'idle' || !s.piece) return { kind: 'idle' };
+    const w = s.piece, c = cums(w), n = w.segments.length, tot = c[n];
+    if (s.mode === 'title') { const i = segIndex(c, s.seek); return { kind: 'title', piece: w, seek: s.seek, i, n, bg: w.segments[i].bg, fg: w.segments[i].fg }; }
     const waiting = s.since !== null && t < s.since && s.acc === 0;
     const run = s.since === null ? 0 : Math.max(0, Math.min(t, s.until ?? Infinity) - s.since);
     const el = s.seek + s.acc + run;
     const paused = s.until !== null && t >= s.until;
     if (el < tot) {
       const i = segIndex(c, el), start = segIndex(c, s.seek), g = w.segments[i];
-      return { kind: 'run', work: w, i, n, el, paused, waiting, text: fmt(Math.ceil((c[i + 1] - el) / 1000)),
+      return { kind: 'run', piece: w, i, n, el, paused, waiting, text: fmt(Math.ceil((c[i + 1] - el) / 1000)),
                bg: g.bg, fg: g.fg, lit: i > start ? blinkLit(el - c[i]) : true };
     }
-    if (s.list && s.next) { const g = s.next.segments[0]; return { kind: 'next', work: s.next, seek: 0, i: 0, n: s.next.segments.length, bg: g.bg, fg: g.fg, endedAt: t - (el - tot) }; }
+    if (s.list && s.next) { const g = s.next.segments[0]; return { kind: 'next', piece: s.next, seek: 0, i: 0, n: s.next.segments.length, bg: g.bg, fg: g.fg, endedAt: t - (el - tot) }; }
     if (s.list) return { kind: 'end', bg: '#0d0f10', fg: '#f2a541' };
     const g = w.segments[n - 1];
-    return { kind: 'done', work: w, i: n - 1, n, text: fmt(0), bg: g.bg, fg: g.fg, lit: blinkLit(el - tot) };
+    return { kind: 'done', piece: w, i: n - 1, n, text: fmt(0), bg: g.bg, fg: g.fg, lit: blinkLit(el - tot) };
   }
 
   return { draw, fitTitle, ink, fmt, fmtDur, cums, segIndex, strip, placeHead, seekFromX, sample, now, view };

@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl("file:///android_asset/index.html")
 
-        // Back: from the player or the editor to the worklists; from the worklists, the app goes to the background.
+        // Back: from the player or the editor to the setlists; from the setlists, the app goes to the background.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 web.evaluateJavascript("!!(window.relaisBack && window.relaisBack())") { handled ->

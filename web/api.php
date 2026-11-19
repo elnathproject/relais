@@ -1,17 +1,17 @@
 <?php
 /*
- * Relais for ensembles: one work of sequential countdowns, controlled by a conductor and
+ * Relais for ensembles: one piece of sequential countdowns, controlled by a conductor and
  * shown on every display.
  * Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
  * Released under the MIT License: see the LICENSE file.
  *
  * The state lives in data/state.json; the pages poll it every 0.6 s, and receive the whole
  * state only when it has changed (rev). The server never sends the remaining seconds: it sends
- * the work (lengths and colours of its countdowns), the start position and the instants at which
+ * the piece (lengths and colours of its countdowns), the start position and the instants at which
  * the run started and paused. Every display computes the current countdown from its own clock,
  * corrected by the offset from the server's clock, so all displays change countdown together.
- * The end of a work is computed the same way: the server also sends the next work of the
- * worklist, and the displays show its title as soon as the current work ends.
+ * The end of a piece is computed the same way: the server also sends the next piece of the
+ * setlist, and the displays show its title as soon as the current piece ends.
  */
 ini_set('display_errors', '0'); // PHP warnings would reveal the paths of the server
 require __DIR__ . '/config.php';
@@ -38,9 +38,9 @@ const MAX_TOKENS = 20;      // conductor's sessions open at the same time
 const ONLINE_WINDOW = 6;    // seconds without polling after which a display counts as gone
 const MAX_DISPLAYS = 200;   // displays remembered at the same time
 const MAX_SEG_S = 999 * 60 + 59; // longest countdown, in seconds
-const MAX_SEGS = 99;         // countdowns in a work
+const MAX_SEGS = 99;         // countdowns in a piece
 const MAX_NAME = 60;         // characters of a name
-const MAX_BODY = 16384;     // bytes accepted in a request: two works of 99 countdowns stay well below
+const MAX_BODY = 16384;     // bytes accepted in a request: two pieces of 99 countdowns stay well below
 const AUTH_FILE = __DIR__ . '/data/auth.json';
 
 function out($d) { echo json_encode($d, JSON_UNESCAPED_UNICODE); }
@@ -58,9 +58,9 @@ function name_in($v) {
   $v = preg_replace('/[\x00-\x1f\x7f]/u', '', $v) ?? '';
   return function_exists('mb_substr') ? mb_substr($v, 0, MAX_NAME) : substr($v, 0, MAX_NAME);
 }
-// a work as the pages may send it: a name and 1-99 countdowns, each with a length and two colours.
-// Anything else is dropped; a work without valid countdowns is no work (null).
-function work_in($w) {
+// a piece as the pages may send it: a name and 1-99 countdowns, each with a length and two colours.
+// Anything else is dropped; a piece without valid countdowns is no piece (null).
+function piece_in($w) {
   if (!is_array($w) || !is_array($w['segments'] ?? null)) return null;
   $segs = [];
   foreach (array_slice($w['segments'], 0, MAX_SEGS) as $g) {
@@ -71,7 +71,7 @@ function work_in($w) {
   }
   return $segs ? ['name' => name_in($w['name'] ?? ''), 'segments' => $segs] : null;
 }
-function work_ms($w) { $t = 0; foreach ($w['segments'] as $g) $t += $g['s']; return $t * 1000; }
+function piece_ms($w) { $t = 0; foreach ($w['segments'] as $g) $t += $g['s']; return $t * 1000; }
 // the same computer as the server, and not through a proxy (which would make every visitor look local)
 function is_local() {
   foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_FORWARDED', 'HTTP_X_REAL_IP', 'HTTP_CF_CONNECTING_IP'] as $h) if (!empty($_SERVER[$h])) return false;
@@ -90,7 +90,7 @@ if (FORCE_HTTPS && !is_https() && !is_local()) { http_response_code(403); exit('
 // --- request: a small JSON object, nothing else ---
 $rawIn = (string) file_get_contents('php://input', false, null, 0, MAX_BODY + 1);
 if (strlen($rawIn) > MAX_BODY) { http_response_code(413); exit('{"error":"too large"}'); }
-$in = json_decode($rawIn !== '' ? $rawIn : '{}', true, 6); // depth 6: request, work, segments, countdown, value
+$in = json_decode($rawIn !== '' ? $rawIn : '{}', true, 6); // depth 6: request, piece, segments, countdown, value
 if (!is_array($in)) $in = [];
 $a = str($_GET['a'] ?? ($in['a'] ?? ''), 20);
 
@@ -143,14 +143,14 @@ $dirty = false;
 if (!is_array($S)) { $S = []; $dirty = true; }
 $DEFAULTS = [
   'rev' => 0,           // grows at every command: displays redraw when it changes
-  'mode' => 'idle',     // idle (no work loaded), title (title of the work, waiting), run (started)
-  'work' => null,       // the work: name and countdowns
-  'next' => null,       // the next work of the worklist, shown at the end of this one (null: none)
-  'list' => false,      // played as part of a worklist (true) or on its own (false)
-  'wl' => '',           // name of the worklist
-  'pos' => 0,           // position of the work in the worklist, from 0
-  'count' => 1,         // works in the worklist
-  'seek' => 0,          // start position in the work, ms (seek bar of the title)
+  'mode' => 'idle',     // idle (no piece loaded), title (title of the piece, waiting), run (started)
+  'piece' => null,       // the piece: name and countdowns
+  'next' => null,       // the next piece of the setlist, shown at the end of this one (null: none)
+  'list' => false,      // played as part of a setlist (true) or on its own (false)
+  'setlist' => '',           // name of the setlist
+  'pos' => 0,           // position of the piece in the setlist, from 0
+  'count' => 1,         // pieces in the setlist
+  'seek' => 0,          // start position in the piece, ms (seek bar of the title)
   'acc' => 0,           // ms elapsed in the runs that are over
   'since' => null,      // server instant at which the current run starts (null: stopped)
   'until' => null,      // server instant at which the current run is paused (null: running)
@@ -161,14 +161,14 @@ $DEFAULTS = [
 $S += $DEFAULTS;
 // the file is trusted only as far as its types: whatever it holds, the pages receive clean values
 $S['rev'] = (int)$S['rev'];
-$S['work'] = work_in($S['work']);
-$S['next'] = work_in($S['next']);
-$S['mode'] = $S['work'] === null ? 'idle' : (in_array($S['mode'], ['title', 'run'], true) ? $S['mode'] : 'title');
+$S['piece'] = piece_in($S['piece']);
+$S['next'] = piece_in($S['next']);
+$S['mode'] = $S['piece'] === null ? 'idle' : (in_array($S['mode'], ['title', 'run'], true) ? $S['mode'] : 'title');
 $S['list'] = (bool)$S['list'];
-$S['wl'] = name_in($S['wl']);
+$S['setlist'] = name_in($S['setlist']);
 $S['count'] = int_in($S['count'], 1, 999);
 $S['pos'] = int_in($S['pos'], 0, $S['count'] - 1);
-$S['seek'] = $S['work'] ? int_in($S['seek'], 0, work_ms($S['work']) - 1000) : 0;
+$S['seek'] = $S['piece'] ? int_in($S['seek'], 0, piece_ms($S['piece']) - 1000) : 0;
 $S['acc'] = max(0, (int)$S['acc']);
 $S['since'] = $S['mode'] === 'run' && is_numeric($S['since']) ? (int)$S['since'] : null;
 $S['until'] = $S['since'] !== null && is_numeric($S['until']) ? (int)$S['until'] : null;
@@ -189,7 +189,7 @@ $delay = max(0, min(5000, (int)SYNC_DELAY_MS));
 // what every page needs to draw the timer
 function timer($S) {
   $t = ['rev' => $S['rev'], 'now' => now_ms()];
-  foreach (['mode', 'work', 'next', 'list', 'wl', 'pos', 'count', 'seek', 'acc', 'since', 'until', 'vibrate'] as $k) $t[$k] = $S[$k];
+  foreach (['mode', 'piece', 'next', 'list', 'setlist', 'pos', 'count', 'seek', 'acc', 'since', 'until', 'vibrate'] as $k) $t[$k] = $S[$k];
   return $t;
 }
 function online($S) {
@@ -275,7 +275,7 @@ switch ($a) {
     $running = $S['mode'] === 'run' && $S['since'] !== null && $S['until'] === null;
     switch ($a) {
       case 'state': break;
-      case 'logout': { // closes the timer too, unless another conductor is at work right now
+      case 'logout': { // closes the timer too, unless another conductor is at piece right now
         unset($A['tokens'][token_hash($token)]); auth_save($A);
         unset($S['conductors'][substr(token_hash($token), 0, 16)]);
         $others = false;
@@ -284,13 +284,13 @@ switch ($a) {
         $dirty = true; $token = '';
         break;
       }
-      case 'load': { // a work becomes the current one, on its title; optionally started at once
-        $w = work_in($in['work'] ?? null);
+      case 'load': { // a piece becomes the current one, on its title; optionally started at once
+        $w = piece_in($in['piece'] ?? null);
         if ($w === null) break;
-        $S['work'] = $w; $S['next'] = !empty($in['list']) ? work_in($in['next'] ?? null) : null;
-        $S['list'] = !empty($in['list']); $S['wl'] = name_in($in['wl'] ?? '');
+        $S['piece'] = $w; $S['next'] = !empty($in['list']) ? piece_in($in['next'] ?? null) : null;
+        $S['list'] = !empty($in['list']); $S['setlist'] = name_in($in['setlist'] ?? '');
         $S['count'] = int_in($in['count'] ?? 1, 1, 999); $S['pos'] = int_in($in['pos'] ?? 0, 0, $S['count'] - 1);
-        $S['seek'] = int_in(round(((float)($in['seek'] ?? 0)) / 1000) * 1000, 0, work_ms($w) - 1000);
+        $S['seek'] = int_in(round(((float)($in['seek'] ?? 0)) / 1000) * 1000, 0, piece_ms($w) - 1000);
         $S['acc'] = 0; $S['since'] = null; $S['until'] = null; $S['mode'] = 'title';
         if (!empty($in['start'])) { $S['mode'] = 'run'; $S['since'] = $at; }
         $S['rev']++; $dirty = true;
@@ -298,7 +298,7 @@ switch ($a) {
       }
       case 'seek': // start position, on the title only
         if ($S['mode'] === 'title') {
-          $S['seek'] = int_in(round(((float)($in['ms'] ?? 0)) / 1000) * 1000, 0, work_ms($S['work']) - 1000);
+          $S['seek'] = int_in(round(((float)($in['ms'] ?? 0)) / 1000) * 1000, 0, piece_ms($S['piece']) - 1000);
           $S['rev']++; $dirty = true;
         }
         break;
@@ -316,13 +316,13 @@ switch ($a) {
           $S['since'] = max($at, $S['until']); $S['until'] = null; $S['rev']++; $dirty = true;
         }
         break;
-      case 'reset': // back to the title of the same work, at the same start position
-        if ($S['work'] !== null) {
+      case 'reset': // back to the title of the same piece, at the same start position
+        if ($S['piece'] !== null) {
           $S['mode'] = 'title'; $S['acc'] = 0; $S['since'] = null; $S['until'] = null; $S['rev']++; $dirty = true;
         }
         break;
-      case 'clear': // no work: the displays wait for the conductor
-        $S['mode'] = 'idle'; $S['work'] = null; $S['next'] = null; $S['seek'] = 0;
+      case 'clear': // no piece: the displays wait for the conductor
+        $S['mode'] = 'idle'; $S['piece'] = null; $S['next'] = null; $S['seek'] = 0;
         $S['acc'] = 0; $S['since'] = null; $S['until'] = null; $S['rev']++; $dirty = true;
         break;
       case 'look': // vibration at each change, at any moment

@@ -72,29 +72,29 @@
     else if (v.kind === 'title' || v.kind === 'next') {
       colors(v.bg, v.fg);
       // the next title appears while watching: it blinks, as in the app
-      setTitle(v.work.name, v.kind === 'next' && last.kind === 'run');
+      setTitle(v.piece.name, v.kind === 'next' && last.kind === 'run');
       if (v.kind === 'next' && last.kind === 'run') vibrate();
       const pos = v.kind === 'next' ? S.pos + 1 : S.pos;
-      label.textContent = S.list ? `${pos + 1}/${S.count} · ${S.wl}` : 'Ready';
-      const key = JSON.stringify([v.work.segments, v.seek]);
+      label.textContent = S.list ? `${pos + 1}/${S.count} · ${S.setlist}` : 'Ready';
+      const key = JSON.stringify([v.piece.segments, v.seek]);
       if (key !== last.seekKey) {
         last.seekKey = key;
-        Relais.strip($('strip'), v.work);
-        Relais.placeHead($('scrub'), $('strip'), $('head'), $('past'), v.work, v.seek);
-        const c = Relais.cums(v.work), t = Relais.segIndex(c, v.seek);
+        Relais.strip($('strip'), v.piece);
+        Relais.placeHead($('scrub'), $('strip'), $('head'), $('past'), v.piece, v.seek);
+        const c = Relais.cums(v.piece), t = Relais.segIndex(c, v.seek);
         $('pos').textContent = v.seek ? `From ${Relais.fmtDur(v.seek / 1000)} · ${t + 1}/${v.n} · ${Relais.fmt(Math.ceil((c[t + 1] - v.seek) / 1000))} left` : 'From 0:00';
       }
     } else if (v.kind === 'end') {
       colors(v.bg, v.fg); setTitle('End', last.kind === 'run');
       if (last.kind === 'run') vibrate();
-      label.textContent = `End · ${S.wl}`;
+      label.textContent = `End · ${S.setlist}`;
     } else { // run, done
       colors(v.bg, v.fg);
       if (v.kind === 'run' && last.kind === 'run' && v.i > last.i) vibrate();
       if (v.kind === 'done' && last.kind === 'run') vibrate();
       Relais.draw($('digits'), $('fit'), v.text, v.fg, v.lit);
-      label.textContent = v.kind === 'done' ? `End · ${v.work.name}` : v.paused ? `Paused · ${v.i + 1}/${v.n}`
-                        : v.waiting ? 'Starting' : `${v.i + 1}/${v.n} · ${v.work.name}`;
+      label.textContent = v.kind === 'done' ? `End · ${v.piece.name}` : v.paused ? `Paused · ${v.i + 1}/${v.n}`
+                        : v.waiting ? 'Starting' : `${v.i + 1}/${v.n} · ${v.piece.name}`;
     }
     // a title box hidden until now has no size: fit it again whenever the kind of screen changes
     if (v.kind !== last.kind) Relais.fitTitle($('ttl'), $('ttlBox'));
@@ -104,7 +104,7 @@
   new ResizeObserver(() => {
     Relais.fitTitle($('ttl'), $('ttlBox'));
     const v = S ? Relais.view(S) : null;
-    if (v && (v.kind === 'title' || v.kind === 'next')) Relais.placeHead($('scrub'), $('strip'), $('head'), $('past'), v.work, v.seek);
+    if (v && (v.kind === 'title' || v.kind === 'next')) Relais.placeHead($('scrub'), $('strip'), $('head'), $('past'), v.piece, v.seek);
   }).observe($('fit'));
 
   // ---- first tap: full screen and screen kept on ----

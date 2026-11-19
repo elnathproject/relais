@@ -2,7 +2,7 @@
 // Password of the conductor's page. Change it before uploading the folder to the server:
 // at least 8 characters, better a phrase of three or four words, not used anywhere else.
 define('DIRECTOR_PASSWORD', 'changeme');
-// While it stays "changeme" the conductor's page only works when testing on your own computer
+// While it stays "changeme" the conductor's page only pieces when testing on your own computer
 // (localhost): on the server the conductor is asked to change it. An empty password is refused.
 // Changing the password logs out every conductor.
 

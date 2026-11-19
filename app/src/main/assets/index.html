@@ -6,7 +6,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Relais</title>
 <style>
-/* Three views on one page: the library (worklists and works), the editor of a work, the player.
+/* Three views on one page: the library (setlists and pieces), the editor of a piece, the player.
    The player keeps Élan's layout: digits as large as the screen allows, controls hidden while time runs. */
 :root {
   --bg: #0d0f10;
@@ -67,27 +67,27 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 .name:focus { outline: none; border-bottom-color: var(--accent); }
 
 /* ---- Library ---- */
-.wl { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 14px; }
-.wlhead { display: flex; align-items: center; gap: 6px; }
-.wlhead .name { text-transform: uppercase; letter-spacing: .1em; font-size: 15px; }
-.wlhead .wlstart { height: 36px; padding: 0 12px; flex: none; }
+.sl { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 14px; }
+.slhead { display: flex; align-items: center; gap: 6px; }
+.slhead .name { text-transform: uppercase; letter-spacing: .1em; font-size: 15px; }
+.slhead .slstart { height: 36px; padding: 0 12px; flex: none; }
 .btn:disabled { opacity: .35; cursor: default; }
-/* Start of a single work: the same accent as Start of a worklist */
+/* Start of a single piece: the same accent as Start of a setlist */
 .mini.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 14px; }
-.works { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.work { display: flex; align-items: center; gap: 8px; }
-.workbody {
+.pieces { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.piece { display: flex; align-items: center; gap: 8px; }
+.piecebody {
   flex: 1; min-width: 0; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
   color: var(--fg); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;
 }
-.workbody .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.workbody .wname { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workbody .total { font: 13px var(--font-digits); color: var(--muted); flex: none; }
-.workbody .durs { font: 13px var(--font-digits); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.piecebody .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.piecebody .wname { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.piecebody .total { font: 13px var(--font-digits); color: var(--muted); flex: none; }
+.piecebody .durs { font: 13px var(--font-digits); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; }
 .strip span { min-width: 3px; border-bottom: 3px solid; }
-.wlfoot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
-.wlfoot div { display: flex; gap: 8px; }
+.slfoot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
+.slfoot div { display: flex; gap: 8px; }
 .empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
 .libfoot { display: flex; gap: 10px; padding-top: 6px; flex: none; }
 .libfoot .btn { flex: 1; height: 48px; }
@@ -132,7 +132,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 .psetup { width: 100%; max-width: 560px; }
 .psetup .mid { display: flex; flex-direction: column; gap: 6px; text-align: center; }
 .psetup .durs { font: 13px var(--font-digits); opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* title of the work, as large as the box allows (size set by fitTitle) */
+/* title of the piece, as large as the box allows (size set by fitTitle) */
 .ttl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 /* upright sans serif: from a distance it reads better than an italic */
 #ttl { font: 600 40px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--seg-fg); text-align: center; line-height: 1.1;
@@ -155,11 +155,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 #player[data-mode="end"] .scrub, #player[data-mode="end"] .seekrow { display: none; }
 .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding-top: 10px; flex: none; }
 #player[data-mode="title"] .controls { grid-template-columns: 1fr 2fr 1fr; }
-#player:not([data-mode="title"]) #nextWork { display: none; }
-/* a single work: no previous or next on its title, Start only */
+#player:not([data-mode="title"]) #nextPiece { display: none; }
+/* a single piece: no previous or next on its title, Start only */
 #player[data-list="0"][data-mode="title"] .controls { grid-template-columns: 1fr; }
-#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"] #nextWork { display: none; }
-#nextWork { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
+#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"] #nextPiece { display: none; }
+#nextPiece { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
 .controls button:disabled { opacity: .35; cursor: default; }
 .controls button { height: 58px; border-radius: 10px; font: 600 17px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
 #reset { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
@@ -211,19 +211,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     </div>
   </div>
   <div class="scroll" id="libList"></div>
-  <div class="libfoot"><button class="btn" id="newWl">+ New worklist</button></div>
+  <div class="libfoot"><button class="btn" id="newSl">+ New setlist</button></div>
   <input type="file" id="importFile" accept=".json,application/json" hidden>
 </section>
 
 <!-- ================= Editor ================= -->
 <section class="view" id="editor" hidden>
   <div class="top">
-    <button class="iconbtn" id="edBack">‹ Worklists</button>
+    <button class="iconbtn" id="edBack">‹ Setlists</button>
     <span class="small" id="edWhere"></span>
   </div>
   <div class="scroll">
     <div class="field">
-      <label for="edName">Work</label>
+      <label for="edName">Piece</label>
       <input class="name" id="edName" maxlength="60" style="font-size:22px">
     </div>
     <div class="lbl" style="margin-bottom:8px">Countdowns <span id="edTotal" style="font-family:var(--font-digits);letter-spacing:0;text-transform:none"></span></div>
@@ -242,7 +242,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   <div class="top">
     <div class="phase"><i></i><span id="phaseLabel"></span></div>
     <div class="tools">
-      <button class="iconbtn" id="plBack">Worklists</button>
+      <button class="iconbtn" id="plBack">Setlists</button>
       <button class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound and vibration at each change">Sound</button>
       <button class="iconbtn" id="full">Full screen</button>
     </div>
@@ -250,12 +250,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   <div class="stage" id="stage">
     <div class="fit" id="fit">
       <canvas id="digits" role="img" aria-label="00:00"></canvas>
-      <!-- title screen: the name of the work, static until the pedal starts it -->
+      <!-- title screen: the name of the piece, static until the pedal starts it -->
       <div class="ttl" id="ttlBox"><div id="ttl" role="heading" aria-level="1"></div></div>
     </div>
     <div class="psetup" id="psetup">
       <div class="mid">
-        <!-- seek bar: where the work will start from, as in an audio player -->
+        <!-- seek bar: where the piece will start from, as in an audio player -->
         <div class="scrub" id="scrub" role="slider" aria-label="Start position" aria-valuemin="0">
           <div class="strip" id="plStrip"></div>
           <div class="past" id="past"></div>
@@ -274,7 +274,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   <div class="controls" id="controls">
     <button id="reset">Reset</button>
     <button id="main">Start</button>
-    <button id="nextWork">Next ›</button>
+    <button id="nextPiece">Next ›</button>
   </div>
   <div class="hint" id="hint" hidden>Tap for controls</div>
 </section>
@@ -282,16 +282,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 <div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
   <div class="card">
     <h2 id="abTitle">Relais</h2>
-    <div class="ver">Version 0.4.1</div>
+    <div class="ver">Version 0.5.0</div>
     <p>Sequential countdowns: each one starts by itself when the previous one ends, with its own colours.</p>
-    <h3>Works and worklists</h3>
-    <p>Tap a work to edit its countdowns. ▶ next to a work plays it alone: it stops at 00:00. <strong>▶ Start</strong> on a worklist plays it as a set list: each work opens on its title, and when one ends the title of the next appears.</p>
+    <h3>Pieces and setlists</h3>
+    <p>Tap a piece to edit its countdowns. ▶ next to a piece plays it alone: it stops at 00:00. <strong>▶ Start</strong> on a setlist plays it in order: each piece opens on its title, and when one ends the title of the next appears.</p>
     <h3>Starting from a point</h3>
     <p>On the title, the coloured bar works like the progress bar of an audio player: tap or drag the head, or use − and +, to start from any point. Reset brings you back to the same point.</p>
     <h3>Bluetooth pedal</h3>
-    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the work. On a countdown, right pauses and resumes, left resets to the title. On a title, left does nothing, so a stray press never changes the work.</p>
+    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the piece. On a countdown, right pauses and resumes, left resets to the title. On a title, left does nothing, so a stray press never changes the piece.</p>
     <h3>Export and import</h3>
-    <p><strong>Export</strong> at the top saves all the worklists in one file; Export inside a worklist saves that one only. <strong>Import</strong> adds the worklists of a file to those already here, without replacing them. Use it to keep a copy, to move to another phone, or to load the worklists into the web version for ensembles. Export before uninstalling the app: its worklists are lost with it.</p>
+    <p><strong>Export</strong> at the top saves all the setlists in one file; Export inside a setlist saves that one only. <strong>Import</strong> adds the setlists of a file to those already here, without replacing them. Use it to keep a copy, to move to another phone, or to load the setlists into the web version for ensembles. Export before uninstalling the app: its setlists are lost with it.</p>
     <hr>
     <p>Designed and built by Alessandro Ciccarelli.<br><a href="https://alessandrociccarelli.com" target="_blank" rel="noopener">alessandrociccarelli.com</a></p>
     <p class="small">© 2026. Free software under the MIT License. Works offline and collects no data.</p>
@@ -306,11 +306,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   const body = document.body;
 
   // ================= Data =================
-  // library = { worklists: [ { id, name, works: [ { id, name, segments: [ {s, bg, fg} ] } ] } ] }
-  // In the player a worklist is a set list: at the end of a work the title of the next one appears.
+  // library = { setlists: [ { id, name, pieces: [ { id, name, segments: [ {s, bg, fg} ] } ] } ] }
+  // In the player a setlist is played in order: at the end of a piece the title of the next one appears.
+  // (Until 0.4.1 setlists and pieces were called worklists and works.)
   // s = length in seconds; bg, fg = background and digit colours (#rrggbb).
   const STORE = 'relais-library-v1';
-  const FORMAT = 'relais-worklists';
+  const FORMAT = 'relais-setlists';
   const MAX_S = 999 * 60 + 59, MAX_SEGS = 99, MAX_NAME = 60;
   // background / digit pairs offered in the editor; new countdowns take them in turn so they differ at a glance
   // (consecutive pairs never share the background)
@@ -322,10 +323,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   const HEX = /^#[0-9a-f]{6}$/i;
   const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const seg = (s, i) => ({ s, bg: PAIRS[i % PAIRS.length][0], fg: PAIRS[i % PAIRS.length][1] });
-  const mkWork = (name, secs) => ({ id: uid(), name, segments: secs.map(seg) });
-  const example = () => ({ worklists: [
-    { id: uid(), name: 'Worklist 1', works: [mkWork('Work 1', [450, 300, 900, 224]), mkWork('Work 2', [276, 416, 194])] },
-    { id: uid(), name: 'Worklist 2', works: [] }
+  const mkPiece = (name, secs) => ({ id: uid(), name, segments: secs.map(seg) });
+  const example = () => ({ setlists: [
+    { id: uid(), name: 'Setlist 1', pieces: [mkPiece('Piece 1', [450, 300, 900, 224]), mkPiece('Piece 2', [276, 416, 194])] },
+    { id: uid(), name: 'Setlist 2', pieces: [] }
   ] });
 
   // anything that comes from storage or from a file is cleaned before use
@@ -333,21 +334,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     name: (v, d) => (typeof v === 'string' ? v : d).slice(0, MAX_NAME),
     color: (v, d) => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : d),
     secs: v => Math.max(1, Math.min(MAX_S, Math.round(+v) || 1)),
-    work(w, i) {
+    piece(w, i) {
       if (!w || typeof w !== 'object') return null;
       const segs = (Array.isArray(w.segments) ? w.segments : []).slice(0, MAX_SEGS).map((s, k) => s && typeof s === 'object'
         ? { s: clean.secs(s.s), bg: clean.color(s.bg, PAIRS[k % PAIRS.length][0]), fg: clean.color(s.fg, PAIRS[k % PAIRS.length][1]) } : null).filter(Boolean);
       if (!segs.length) segs.push(seg(60, 0));
-      return { id: uid(), name: clean.name(w.name, `Work ${i + 1}`), segments: segs };
+      return { id: uid(), name: clean.name(w.name, `Piece ${i + 1}`), segments: segs };
     },
-    worklist(l, i) {
+    setlist(l, i) {
       if (!l || typeof l !== 'object') return null;
-      return { id: uid(), name: clean.name(l.name, `Worklist ${i + 1}`),
-               works: (Array.isArray(l.works) ? l.works : []).map(clean.work).filter(Boolean) };
+      return { id: uid(), name: clean.name(l.name, `Setlist ${i + 1}`),
+               pieces: (Array.isArray(l.pieces) ? l.pieces : []).map(clean.piece).filter(Boolean) };
     },
     library(x) {
-      const wls = x && Array.isArray(x.worklists) ? x.worklists : null;
-      return wls ? { worklists: wls.map(clean.worklist).filter(Boolean) } : null;
+      const wls = x && Array.isArray(x.setlists) ? x.setlists : null;
+      return wls ? { setlists: wls.map(clean.setlist).filter(Boolean) } : null;
     }
   };
   let lib = null;
@@ -359,7 +360,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   const fmtDur = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60, p = n => String(n).padStart(2, '0');
                         return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`; };
   const total = w => w.segments.reduce((a, s) => a + s.s, 0);
-  const findWork = id => { for (const l of lib.worklists) { const i = l.works.findIndex(w => w.id === id); if (i >= 0) return { l, i, w: l.works[i] }; } return null; };
+  const findPiece = id => { for (const l of lib.setlists) { const i = l.pieces.findIndex(w => w.id === id); if (i >= 0) return { l, i, w: l.pieces[i] }; } return null; };
   const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; };
 
   // small DOM helper: h('button', { className, onclick }, 'text', child…)
@@ -396,52 +397,52 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   // ================= Library =================
   function renderLibrary() {
     const box = $('libList'); box.textContent = '';
-    lib.worklists.forEach((l, li) => {
-      const name = h('input', { className: 'name', value: l.name, maxLength: MAX_NAME, ariaLabel: 'Worklist name' });
+    lib.setlists.forEach((l, li) => {
+      const name = h('input', { className: 'name', value: l.name, maxLength: MAX_NAME, ariaLabel: 'Setlist name' });
       name.addEventListener('input', () => { l.name = name.value; save(); });
-      const up = h('button', { className: 'mini', textContent: '▲', disabled: li === 0, ariaLabel: 'Move worklist up', onclick: () => { move(lib.worklists, li, -1); save(); renderLibrary(); } });
-      const dn = h('button', { className: 'mini', textContent: '▼', disabled: li === lib.worklists.length - 1, ariaLabel: 'Move worklist down', onclick: () => { move(lib.worklists, li, 1); save(); renderLibrary(); } });
-      const works = h('div', { className: 'works' });
-      if (!l.works.length) works.append(h('div', { className: 'empty', textContent: 'No works yet.' }));
-      l.works.forEach((w, wi) => {
+      const up = h('button', { className: 'mini', textContent: '▲', disabled: li === 0, ariaLabel: 'Move setlist up', onclick: () => { move(lib.setlists, li, -1); save(); renderLibrary(); } });
+      const dn = h('button', { className: 'mini', textContent: '▼', disabled: li === lib.setlists.length - 1, ariaLabel: 'Move setlist down', onclick: () => { move(lib.setlists, li, 1); save(); renderLibrary(); } });
+      const pieces = h('div', { className: 'pieces' });
+      if (!l.pieces.length) pieces.append(h('div', { className: 'empty', textContent: 'No pieces yet.' }));
+      l.pieces.forEach((w, wi) => {
         const st = h('div', { className: 'strip' }); strip(st, w);
-        const card = h('button', { className: 'workbody', ariaLabel: `Edit ${w.name}`, onclick: () => openEditor(w.id) },
+        const card = h('button', { className: 'piecebody', ariaLabel: `Edit ${w.name}`, onclick: () => openEditor(w.id) },
           h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: fmtDur(total(w)) })),
           st,
           h('div', { className: 'durs', textContent: w.segments.map(s => fmtDur(s.s)).join(' · ') }));
-        works.append(h('div', { className: 'work' }, card,
-          h('button', { className: 'mini', textContent: '▲', disabled: wi === 0, ariaLabel: 'Move work up', onclick: () => { move(l.works, wi, -1); save(); renderLibrary(); } }),
-          h('button', { className: 'mini', textContent: '▼', disabled: wi === l.works.length - 1, ariaLabel: 'Move work down', onclick: () => { move(l.works, wi, 1); save(); renderLibrary(); } }),
-          h('button', { className: 'mini go wkstart', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => openPlayer(w.id, false) })));
+        pieces.append(h('div', { className: 'piece' }, card,
+          h('button', { className: 'mini', textContent: '▲', disabled: wi === 0, ariaLabel: 'Move piece up', onclick: () => { move(l.pieces, wi, -1); save(); renderLibrary(); } }),
+          h('button', { className: 'mini', textContent: '▼', disabled: wi === l.pieces.length - 1, ariaLabel: 'Move piece down', onclick: () => { move(l.pieces, wi, 1); save(); renderLibrary(); } }),
+          h('button', { className: 'mini go pcstart', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => openPlayer(w.id, false) })));
       });
       const del = h('button', { className: 'btn danger' });
-      twoTap(del, 'Delete', () => { lib.worklists.splice(li, 1); save(); renderLibrary(); });
-      box.append(h('div', { className: 'wl' },
-        h('div', { className: 'wlhead' }, name, up, dn,
-          h('button', { className: 'btn primary wlstart', textContent: '▶ Start', disabled: !l.works.length, ariaLabel: `Start the worklist ${l.name}`,
-                        onclick: () => openPlayer(l.works[0].id, true) })),
-        works,
-        h('div', { className: 'wlfoot' },
-          h('button', { className: 'btn', textContent: '+ Work', onclick: () => {
-            const w = mkWork(`Work ${l.works.length + 1}`, [300]); l.works.push(w); save(); openEditor(w.id);
+      twoTap(del, 'Delete', () => { lib.setlists.splice(li, 1); save(); renderLibrary(); });
+      box.append(h('div', { className: 'sl' },
+        h('div', { className: 'slhead' }, name, up, dn,
+          h('button', { className: 'btn primary slstart', textContent: '▶ Start', disabled: !l.pieces.length, ariaLabel: `Start the setlist ${l.name}`,
+                        onclick: () => openPlayer(l.pieces[0].id, true) })),
+        pieces,
+        h('div', { className: 'slfoot' },
+          h('button', { className: 'btn', textContent: '+ Piece', onclick: () => {
+            const w = mkPiece(`Piece ${l.pieces.length + 1}`, [300]); l.pieces.push(w); save(); openEditor(w.id);
           } }),
-          h('div', {}, h('button', { className: 'btn', textContent: 'Export', onclick: () => exportJson({ worklists: [l] }, l.name) }), del))));
+          h('div', {}, h('button', { className: 'btn', textContent: 'Export', onclick: () => exportJson({ setlists: [l] }, l.name) }), del))));
     });
-    if (!lib.worklists.length) box.append(h('div', { className: 'empty', textContent: 'No worklists. Create one, or import a file.' }));
+    if (!lib.setlists.length) box.append(h('div', { className: 'empty', textContent: 'No setlists. Create one, or import a file.' }));
   }
-  $('newWl').addEventListener('click', () => {
-    lib.worklists.push({ id: uid(), name: `Worklist ${lib.worklists.length + 1}`, works: [] }); save(); renderLibrary();
+  $('newSl').addEventListener('click', () => {
+    lib.setlists.push({ id: uid(), name: `Setlist ${lib.setlists.length + 1}`, pieces: [] }); save(); renderLibrary();
     const s = $('libList'); s.scrollTop = s.scrollHeight;
   });
 
-  // ---- import / export: a JSON file with one or more worklists ----
-  // In the browser: download and file picker. In the Android app the page will hand the file to the app
-  // (window.Android.saveFile / openFile), still to be written.
+  // ---- import / export: a JSON file with one or more setlists ----
+  // In the browser: download and file picker. In the Android app the page hands the file to the app
+  // (window.Android.saveFile / openFile), which uses the system file picker.
   function exportJson(data, name) {
     const out = { format: FORMAT, version: 1, exported: new Date().toISOString(),
-                  worklists: data.worklists.map(l => ({ name: l.name, works: l.works.map(w => ({ name: w.name, segments: w.segments })) })) };
+                  setlists: data.setlists.map(l => ({ name: l.name, pieces: l.pieces.map(w => ({ name: w.name, segments: w.segments })) })) };
     const text = JSON.stringify(out, null, 2);
-    const file = (name || 'worklists').replace(/[^\w.-]+/g, '_').slice(0, 40) + '.json';
+    const file = (name || 'setlists').replace(/[^\w.-]+/g, '_').slice(0, 40) + '.json';
     if (window.Android && Android.saveFile) { Android.saveFile(file, text); return; }
     const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: file });
     document.body.append(a); a.click(); a.remove();
@@ -450,13 +451,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   function importText(text) {
     let x = null;
     try { x = clean.library(JSON.parse(text)); } catch (e) {}
-    if (!x || !x.worklists.length) { toast('This file holds no worklists.'); return; }
-    lib.worklists.push(...x.worklists); save(); renderLibrary();
-    const n = x.worklists.length, m = x.worklists.reduce((a, l) => a + l.works.length, 0);
-    toast(`Imported ${n} worklist${n > 1 ? 's' : ''}, ${m} work${m === 1 ? '' : 's'}.`);
+    if (!x || !x.setlists.length) { toast('This file holds no setlists.'); return; }
+    lib.setlists.push(...x.setlists); save(); renderLibrary();
+    const n = x.setlists.length, m = x.setlists.reduce((a, l) => a + l.pieces.length, 0);
+    toast(`Imported ${n} setlist${n > 1 ? 's' : ''}, ${m} piece${m === 1 ? '' : 's'}.`);
   }
   window.relaisImport = importText; // entry point for the Android app
-  $('exportAll').addEventListener('click', () => exportJson(lib, 'worklists'));
+  $('exportAll').addEventListener('click', () => exportJson(lib, 'setlists'));
   $('importBtn').addEventListener('click', () => { if (window.Android && Android.openFile) Android.openFile(); else $('importFile').click(); });
   $('importFile').addEventListener('change', e => {
     const f = e.target.files[0]; e.target.value = '';
@@ -477,7 +478,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     return box;
   }
   function renderEditor() {
-    const f = findWork(edId); if (!f) { go('library'); return; }
+    const f = findPiece(edId); if (!f) { go('library'); return; }
     const w = f.w;
     $('edName').value = w.name;
     $('edWhere').textContent = f.l.name;
@@ -514,17 +515,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     });
     $('addSeg').disabled = w.segments.length >= MAX_SEGS;
   }
-  $('edName').addEventListener('input', () => { const f = findWork(edId); if (f) { f.w.name = $('edName').value; save(); } });
-  $('addSeg').addEventListener('click', () => { const f = findWork(edId); if (!f) return; f.w.segments.push(seg(60, f.w.segments.length)); save(); renderEditor();
+  $('edName').addEventListener('input', () => { const f = findPiece(edId); if (f) { f.w.name = $('edName').value; save(); } });
+  $('addSeg').addEventListener('click', () => { const f = findPiece(edId); if (!f) return; f.w.segments.push(seg(60, f.w.segments.length)); save(); renderEditor();
     const sc = $('editor').querySelector('.scroll'); sc.scrollTop = sc.scrollHeight; });
   $('edBack').addEventListener('click', () => go('library'));
   $('edPlay').addEventListener('click', () => openPlayer(edId, false));
   $('edDup').addEventListener('click', () => {
-    const f = findWork(edId); if (!f) return;
+    const f = findPiece(edId); if (!f) return;
     const c = JSON.parse(JSON.stringify(f.w)); c.id = uid(); c.name = (f.w.name + ' copy').slice(0, MAX_NAME);
-    f.l.works.splice(f.i + 1, 0, c); save(); openEditor(c.id); toast('Duplicated.');
+    f.l.pieces.splice(f.i + 1, 0, c); save(); openEditor(c.id); toast('Duplicated.');
   });
-  twoTap($('edDelete'), 'Delete', () => { const f = findWork(edId); if (f) { f.l.works.splice(f.i, 1); save(); } go('library'); });
+  twoTap($('edDelete'), 'Delete', () => { const f = findPiece(edId); if (f) { f.l.pieces.splice(f.i, 1); save(); } go('library'); });
 
   // ================= Seven-segment digits (Élan's drawing) =================
   const SEG = { 0:'abcdef', 1:'bc', 2:'abged', 3:'abgcd', 4:'fgbc', 5:'afgcd', 6:'afgedc', 7:'abc', 8:'abcdefg', 9:'abcdfg' };
@@ -603,15 +604,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   const fmt = t => { const hh = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60, p = n => String(n).padStart(2, '0');
                      return hh ? `${hh}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`; };
 
-  // Two ways to play, both opening on the title of a work, static until the pedal starts it.
-  // A worklist (Start of the worklist) is a set list: when the last countdown of a work ends, the
-  // title of the next work appears, and after the last work a closing screen.
-  // A single work (its own Start) stops at 00:00 when its last countdown ends.
-  // Modes: 'title' (name of the work), 'run' (countdowns), 'done' (single work over, 00:00),
-  // 'end' (end of the worklist).
+  // Two ways to play, both opening on the title of a piece, static until the pedal starts it.
+  // A setlist (its own Start) is played in order: when the last countdown of a piece ends, the
+  // title of the next piece appears, and after the last piece a closing screen.
+  // A single piece (its own Start) stops at 00:00 when its last countdown ends.
+  // Modes: 'title' (name of the piece), 'run' (countdowns), 'done' (single piece over, 00:00),
+  // 'end' (end of the setlist).
   function openPlayer(id, asList) {
-    const f = findWork(id); if (!f) return;
-    P = { l: f.l, list: !!asList, seq: asList ? f.l.works : [f.w], i: asList ? f.i : 0,
+    const f = findPiece(id); if (!f) return;
+    P = { l: f.l, list: !!asList, seq: asList ? f.l.pieces : [f.w], i: asList ? f.i : 0,
           mode: 'title', startAt: 0, pausedAt: null, idx: 0, blinkAt: -1e9 };
     pl.dataset.list = asList ? '1' : '0';
     go('player'); keepAwake(); toTitle(P.i, false);
@@ -649,7 +650,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     if (blink) { void el.offsetWidth; el.classList.add('blink'); }
   }
   // keepSeek: Reset brings back the title with the start position chosen before (to rehearse from
-  // the same point); a different work, or the next one in a worklist, starts from 0:00.
+  // the same point); a different piece, or the next one in a setlist, starts from 0:00.
   function toTitle(i, blink, keepSeek) {
     stopClock(); load(i); setMode('title');
     if (!keepSeek) P.seek = 0;
@@ -663,7 +664,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     $('plDurs').textContent = P.w.segments.map(s => fmtDur(s.s)).join(' · ') + ' = ' + fmtDur(total(P.w));
     label.textContent = P.list ? `${i + 1}/${n} · ${P.l.name}` : 'Ready';
     $('reset').textContent = '‹ Prev'; $('reset').disabled = i === 0;
-    $('nextWork').disabled = i === n - 1;
+    $('nextPiece').disabled = i === n - 1;
     mainB.textContent = 'Start'; mainB.disabled = false;
     immerse();
   }
@@ -673,14 +674,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     setTitle('End', true);
     const n = P.seq.length;
     $('plStrip').textContent = '';
-    $('plDurs').textContent = `${n} work${n > 1 ? 's' : ''} · ${fmtDur(P.seq.reduce((a, w) => a + total(w), 0))}`;
+    $('plDurs').textContent = `${n} piece${n > 1 ? 's' : ''} · ${fmtDur(P.seq.reduce((a, w) => a + total(w), 0))}`;
     label.textContent = `End · ${P.l.name}`;
     $('reset').textContent = '‹ Back'; $('reset').disabled = false;
     mainB.textContent = 'End'; mainB.disabled = true;
     immerse();
   }
   const now = () => P.pausedAt ?? Date.now();
-  // what to show after `el` ms: index of the countdown (n = the work is over), text, colours
+  // what to show after `el` ms: index of the countdown (n = the piece is over), text, colours
   function at(el) {
     const c = P.cum, segs = P.w.segments, n = segs.length;
     if (el >= c[n]) return { i: n };
@@ -695,7 +696,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
       if (st.i >= n) { // last countdown over
         signal();
         if (P.list) { if (P.i + 1 < P.seq.length) toTitle(P.i + 1, true); else toEnd(); return; }
-        // a single work stops at 00:00, blinking in time like any change
+        // a single piece stops at 00:00, blinking in time like any change
         setMode('done'); P.blinkAt = P.startAt + P.cum[n];
         mainB.textContent = 'End'; mainB.disabled = true; immerse();
       } else if (st.i !== P.idx) {
@@ -822,23 +823,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     if (!P) return;
     if (P.mode === 'title') start();
     else if (P.mode === 'run') P.pausedAt !== null ? resume() : pause();
-    // single work over, or end of the worklist: forward does nothing
+    // single piece over, or end of the setlist: forward does nothing
   }
-  // the left button: previous work on a title of a worklist, otherwise the same as the left pedal
+  // the left button: previous piece on a title of a setlist, otherwise the same as the left pedal
   function backButton() {
     if (P && P.mode === 'title') { if (P.list && P.i > 0) toTitle(P.i - 1, false); }
     else backAction();
   }
-  // the left pedal: nothing on a title (a stray press on stage must not change the work)
+  // the left pedal: nothing on a title (a stray press on stage must not change the piece)
   function backAction() {
     if (!P) return;
     if (P.mode === 'title') return;
-    else if (P.mode === 'run' || P.mode === 'done') toTitle(P.i, false, true); // reset: back to the title of this work
-    else toTitle(P.seq.length - 1, false);                                    // from the end of the list: last work
+    else if (P.mode === 'run' || P.mode === 'done') toTitle(P.i, false, true); // reset: back to the title of this piece
+    else toTitle(P.seq.length - 1, false);                                    // from the end of the list: last piece
   }
   mainB.addEventListener('click', mainAction);
   $('reset').addEventListener('click', backButton);
-  $('nextWork').addEventListener('click', () => { if (P && P.list && P.mode === 'title' && P.i + 1 < P.seq.length) toTitle(P.i + 1, false); });
+  $('nextPiece').addEventListener('click', () => { if (P && P.list && P.mode === 'title' && P.i + 1 < P.seq.length) toTitle(P.i + 1, false); });
   $('plBack').addEventListener('click', () => {
     if (P) stopClock();
     try { wake && wake.release(); } catch (e) {} wake = null;
@@ -851,7 +852,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   $('sound').addEventListener('click', e => { sound = !sound; e.currentTarget.setAttribute('aria-pressed', sound); if (sound) { unlockAudio(); beep(); } });
 
   // Bluetooth page-turner pedal, as in Élan. Right (forward): Start on a title, Pause and Resume on
-  // a countdown. Left (back): Reset to the title of the work; nothing on a title. Only in the player.
+  // a countdown. Left (back): Reset to the title of the piece; nothing on a title. Only in the player.
   const PEDAL_MAIN = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
   const PEDAL_BACK = ['ArrowLeft', 'ArrowUp', 'PageUp'];
   const pedalOn = () => view === 'player' && $('about').hidden;

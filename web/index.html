@@ -29,14 +29,14 @@
   #fit { flex:1; min-height:0; position:relative; }
   #digits { position:absolute; inset:0; width:100%; height:100%; display:block; }
   body.paused #digits, body.waiting #digits { opacity:.45; }
-  /* title of the work, upright sans serif: from a distance it reads better than an italic */
+  /* title of the piece, upright sans serif: from a distance it reads better than an italic */
   #ttlBox { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
   #ttl { font:600 40px system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--seg-fg); text-align:center;
     line-height:1.1; width:96%; overflow-wrap:normal; word-break:normal; }
   #ttl.blink { animation:tblink .32s steps(1, end) 5; }
   @keyframes tblink { 0% { opacity:0; } 50% { opacity:1; } }
   body[data-kind="end"] #ttl, body[data-kind="idle"] #ttl { color:var(--seg-ink); opacity:.55; }
-  /* the seek bar, read only: where the conductor will start the work from */
+  /* the seek bar, read only: where the conductor will start the piece from */
   #info { padding-top:8px; }
   .scrub { position:relative; padding:8px 0; }
   .strip { display:flex; height:16px; border-radius:4px; overflow:hidden; gap:2px; box-shadow:0 0 0 1px color-mix(in srgb, var(--seg-ink) 25%, transparent); }

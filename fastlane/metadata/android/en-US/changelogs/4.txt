@@ -1,0 +1,1 @@
+Works and worklists are now called pieces and setlists, the words musicians use. Exported files use the new names: "setlists" and "pieces".
