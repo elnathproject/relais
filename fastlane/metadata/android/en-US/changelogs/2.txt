@@ -1,0 +1,13 @@
+First release of Relais.
+
+A timer for performers: each work is a chain of countdowns with its own colours, and the next countdown starts by itself at zero.
+
+- Worklists played as set lists: a title screen before each work, static until you start it, and the title of the next work as soon as one ends; an end screen after the last.
+- Single works, started on their own, stop at 00:00.
+- Seek bar on the title: start a work from any point, as with the progress bar of an audio player.
+- Digits blink in time with the seconds at every change of countdown.
+- Bluetooth page-turner pedal: on a title, right starts; on a countdown, right pauses and resumes, left resets to the title.
+- Worklists exported and imported as JSON files.
+- Silent by default, screen always on, works offline, no internet permission.
+
+The repository also holds a web version for ensembles (folder web/): a conductor plays the worklists from a password-protected page, and the performers follow them on their phones by scanning a QR code.
