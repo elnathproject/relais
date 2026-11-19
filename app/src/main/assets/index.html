@@ -143,6 +143,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 #player[data-mode="run"] .ttl, #player[data-mode="run"] .psetup,
 #player[data-mode="done"] .ttl, #player[data-mode="done"] .psetup { display: none; }
 #player[data-mode="end"] #ttl { color: var(--seg-ink); opacity: .55; }
+/* seek bar on the title screen */
+.scrub { position: relative; padding: 10px 0; touch-action: none; cursor: pointer; }
+.scrub .strip { height: 22px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-ink) 25%, transparent); }
+.scrub .past { position: absolute; left: 0; top: 10px; height: 22px; width: 0; background: rgba(0,0,0,.5); border-radius: 4px 0 0 4px; pointer-events: none; }
+.scrub .head { position: absolute; top: 4px; bottom: 4px; left: 0; width: 4px; margin-left: -2px; border-radius: 2px;
+               background: var(--seg-ink); box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-bg) 70%, transparent); pointer-events: none; }
+.seekrow { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.seekrow .mini { color: var(--seg-ink); border-color: color-mix(in srgb, var(--seg-ink) 30%, transparent); }
+#seekPos { font: 13px var(--font-digits); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#player[data-mode="end"] .scrub, #player[data-mode="end"] .seekrow { display: none; }
 .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding-top: 10px; flex: none; }
 #player[data-mode="title"] .controls { grid-template-columns: 1fr 2fr 1fr; }
 #player:not([data-mode="title"]) #nextWork { display: none; }
@@ -243,7 +253,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     </div>
     <div class="psetup" id="psetup">
       <div class="mid">
-        <div class="strip" id="plStrip"></div>
+        <!-- seek bar: where the work will start from, as in an audio player -->
+        <div class="scrub" id="scrub" role="slider" aria-label="Start position" aria-valuemin="0">
+          <div class="strip" id="plStrip"></div>
+          <div class="past" id="past"></div>
+          <div class="head" id="head"></div>
+        </div>
+        <div class="seekrow" id="seekrow">
+          <button class="mini" id="seekHome" aria-label="Back to the beginning">⏮</button>
+          <button class="mini" id="seekMinus" aria-label="One second earlier">−</button>
+          <span id="seekPos"></span>
+          <button class="mini" id="seekPlus" aria-label="One second later">+</button>
+        </div>
         <div class="durs" id="plDurs"></div>
       </div>
     </div>
@@ -259,9 +280,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 <div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
   <div class="card">
     <h2 id="abTitle">Relais</h2>
-    <div class="ver">Version 0.3.0</div>
+    <div class="ver">Version 0.4.0</div>
     <p>Sequential countdowns: each one starts by itself when the previous one ends, with its own colours.</p>
     <p>A worklist is a set list: each work opens on its title, and when its last countdown ends the title of the next work appears.</p>
+    <p>On the title of a work, the coloured bar works like the progress bar of an audio player: move the head to start from any point.</p>
     <p>Start a single work with its own ▶: it stops at 00:00 when its last countdown ends. Start a worklist to play it as a set list.</p>
     <p><strong>Bluetooth pedal.</strong> On a title, right starts the countdown. On a countdown, right is Pause and Resume, left is Reset to the title.</p>
     <p>Designed and built by Alessandro Ciccarelli.<br><a href="https://alessandrociccarelli.com" target="_blank" rel="noopener">alessandrociccarelli.com</a></p>
@@ -619,12 +641,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     el.classList.remove('blink');
     if (blink) { void el.offsetWidth; el.classList.add('blink'); }
   }
-  function toTitle(i, blink) {
+  // keepSeek: Reset brings back the title with the start position chosen before (to rehearse from
+  // the same point); a different work, or the next one in a worklist, starts from 0:00.
+  function toTitle(i, blink, keepSeek) {
     stopClock(); load(i); setMode('title');
-    const s0 = P.w.segments[0], n = P.seq.length;
-    colors(s0.bg, s0.fg);
+    if (!keepSeek) P.seek = 0;
+    const n = P.seq.length;
     setTitle(P.w.name, blink);
     strip($('plStrip'), P.w);
+    // in the seek bar each section takes the digit colour: on a title painted in the background
+    // colour of a countdown, that same background would vanish
+    [...$('plStrip').children].forEach((sp, k) => { sp.style.background = P.w.segments[k].fg; sp.style.borderBottomWidth = '0'; });
+    setSeek(P.seek || 0);
     $('plDurs').textContent = P.w.segments.map(s => fmtDur(s.s)).join(' · ') + ' = ' + fmtDur(total(P.w));
     label.textContent = P.list ? `${i + 1}/${n} · ${P.l.name}` : 'Ready';
     $('reset').textContent = '‹ Prev'; $('reset').disabled = i === 0;
@@ -718,7 +746,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 
   function start() {
     unlockAudio(); stopClock();
-    setMode('run'); P.startAt = Date.now();
+    // from the position of the seek bar: the clock starts as if that much time had already run
+    setMode('run'); P.startAt = Date.now() - (P.seek || 0); P.idx = at(P.seek || 0).i;
     mainB.textContent = 'Pause'; $('reset').textContent = 'Reset'; $('reset').disabled = false;
     cur = { text: '', fg: '', lit: true };
     keepAwake(); loop(); immerse(); goFull();
@@ -729,6 +758,58 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     P.startAt += d; P.blinkAt += d; P.pausedAt = null;
     pl.classList.remove('paused'); mainB.textContent = 'Pause'; loop(); immerse();
   }
+  // ---- seek bar: start position, in whole seconds, from 0:00 to one second before the end ----
+  function setSeek(ms) {
+    const tot = P.cum[P.cum.length - 1];
+    P.seek = Math.max(0, Math.min(tot - 1000, Math.round(ms / 1000) * 1000));
+    const st = at(P.seek), n = P.w.segments.length;
+    placeHead();
+    $('scrub').setAttribute('aria-valuemax', tot / 1000); $('scrub').setAttribute('aria-valuenow', P.seek / 1000);
+    $('seekPos').textContent = P.seek
+      ? `From ${fmtDur(P.seek / 1000)} · ${st.i + 1}/${n} · ${st.text} left`
+      : 'From 0:00';
+    $('seekHome').disabled = $('seekMinus').disabled = P.seek === 0;
+    $('seekPlus').disabled = P.seek >= tot - 1000;
+    colors(st.bg, st.fg); // the title takes the colours of the countdown it will start from
+  }
+  // Time and position are mapped on the coloured sections themselves, not on the whole bar:
+  // the gaps between sections would otherwise shift the head away from the colours.
+  function placeHead() {
+    const spans = $('plStrip').children, i = Math.min(at(P.seek).i, spans.length - 1);
+    if (!spans.length) return;
+    const bar = $('scrub').getBoundingClientRect(), r = spans[i].getBoundingClientRect();
+    const f = (P.seek - P.cum[i]) / (P.cum[i + 1] - P.cum[i]);
+    const x = r.left - bar.left + f * r.width;
+    $('head').style.left = x + 'px'; $('past').style.width = (P.seek ? x : 0) + 'px';
+  }
+  new ResizeObserver(() => { if (P && P.mode === 'title') placeHead(); }).observe($('scrub'));
+  const seekFromPointer = e => {
+    const spans = [...$('plStrip').children], x = e.clientX;
+    let i = spans.findIndex(sp => x < sp.getBoundingClientRect().right);
+    if (i < 0) { setSeek(P.cum[P.cum.length - 1]); return; }
+    const r = spans[i].getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (x - r.left) / r.width)); // in a gap: start of the next section
+    setSeek(P.cum[i] + f * (P.cum[i + 1] - P.cum[i]));
+  };
+  $('scrub').addEventListener('pointerdown', e => {
+    if (!P || P.mode !== 'title') return;
+    $('scrub').setPointerCapture(e.pointerId); seekFromPointer(e);
+  });
+  $('scrub').addEventListener('pointermove', e => { if ($('scrub').hasPointerCapture(e.pointerId)) seekFromPointer(e); });
+  // − and +: one second per tap; held down, they repeat
+  function stepper(btn, d) {
+    let t = 0, iv = 0;
+    const stop = () => { clearTimeout(t); clearInterval(iv); };
+    btn.addEventListener('pointerdown', e => {
+      if (!P || P.mode !== 'title') return;
+      e.preventDefault(); setSeek(P.seek + d);
+      t = setTimeout(() => { iv = setInterval(() => setSeek(P.seek + d), 70); }, 400);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(k => btn.addEventListener(k, stop));
+  }
+  stepper($('seekMinus'), -1000); stepper($('seekPlus'), 1000);
+  $('seekHome').addEventListener('click', () => { if (P && P.mode === 'title') setSeek(0); });
+
   // the two pedals, and the two buttons that mirror them
   function mainAction() {
     if (!P) return;
@@ -745,7 +826,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   function backAction() {
     if (!P) return;
     if (P.mode === 'title') return;
-    else if (P.mode === 'run' || P.mode === 'done') toTitle(P.i, false);       // reset: back to the title of this work
+    else if (P.mode === 'run' || P.mode === 'done') toTitle(P.i, false, true); // reset: back to the title of this work
     else toTitle(P.seq.length - 1, false);                                    // from the end of the list: last work
   }
   mainB.addEventListener('click', mainAction);

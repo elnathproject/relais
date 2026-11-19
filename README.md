@@ -7,11 +7,11 @@ Relais is an Android timer for performers. A **work** is a chain of countdowns: 
 <p>
   <img src="docs/screenshots/1-worklists.png" width="200" alt="Worklists, with a Start button for each worklist and each work">
   <img src="docs/screenshots/2-editor.png" width="200" alt="Editing a work: length and colours of each countdown">
-  <img src="docs/screenshots/3-title.png" width="200" alt="Title screen of a work, waiting for the pedal">
+  <img src="docs/screenshots/3-title.png" width="200" alt="Title screen of a work, with the seek bar set to start from 20:00">
   <img src="docs/screenshots/4-countdown.png" width="200" alt="Second countdown of the work, in its own colours">
 </p>
 
-From left: the worklists; editing a work; the title of a work, waiting for the pedal; the second countdown of the work, in its own colours.
+From left: the worklists; editing a work; the title of a work, waiting for the pedal, with the head of the bar set to start from 20:00; the second countdown of the work, in its own colours.
 
 <p>
   <img src="docs/screenshots/5-countdown-landscape.png" width="410" alt="Countdown in landscape">
@@ -23,6 +23,7 @@ From left: the worklists; editing a work; the title of a work, waiting for the p
 - **Colours per countdown.** Every countdown has its own background and digit colour, chosen freely or from ready-made pairs, so the sections of a work can be told apart at a glance.
 - **Blinking in time.** When a new countdown begins, its digits blink for three seconds in step with the seconds: each new value appears lit at the instant it changes, so the count is never hidden.
 - **Worklists as set lists.** Start a worklist and every work opens on its title, shown full screen and static until you start it. When the last countdown of a work ends, the title of the next work appears; after the last work, an end screen.
+- **Start from any point.** On the title of a work, the coloured bar works like the progress bar of an audio player: tap or drag the head, or step it a second at a time, and Start begins from that point, for example from 0:31, in the colours of the countdown it falls in. Reset brings back the same point, to rehearse a passage again; the next work of a worklist starts from 0:00.
 - **Single works.** Start a work on its own and it stops at 00:00 when its last countdown ends.
 - **Foot pedal.** A Bluetooth page-turner pedal, like those used for PDF scores, controls the player. On a title, right starts the countdown. On a countdown, right pauses and resumes, left resets to the title. Arrow keys, Page Up/Down, Space and Enter are all recognised, so any pedal mode works, as does a Bluetooth keyboard.
 - **Ordering.** Worklists, works and countdowns can be moved up and down; works and countdowns can be duplicated.
