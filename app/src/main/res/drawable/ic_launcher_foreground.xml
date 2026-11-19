@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Provisional icon: three LED segments in a row, one colour each, like countdowns handing over
+     to one another (amber, ice blue, aqua). Inside the visible area of the adaptive icon (18-90). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#F2A541" android:pathData="M24,54 L29,48 L41,48 L46,54 L41,60 L29,60 Z" />
+    <path android:fillColor="#6FB7FF" android:pathData="M43,54 L48,48 L60,48 L65,54 L60,60 L48,60 Z" />
+    <path android:fillColor="#9FE3D6" android:pathData="M62,54 L67,48 L79,48 L84,54 L79,60 L67,60 Z" />
+</vector>

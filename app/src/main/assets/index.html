@@ -1,0 +1,804 @@
+<!--
+  Relais, sequential countdowns for performers.
+  Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
+  Released under the MIT License: see the LICENSE file.
+-->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relais</title>
+<style>
+/* Three views on one page: the library (worklists and works), the editor of a work, the player.
+   The player keeps Élan's layout: digits as large as the screen allows, controls hidden while time runs. */
+:root {
+  --bg: #0d0f10;
+  --panel: #171a1c;
+  --line: #2a2f32;
+  --fg: #d9dedf;
+  --muted: #7d8789;
+  --accent: #f2a541;
+  --accent-ink: #1a1205;
+  --run: #9fe3d6;
+  --seg-bg: #0d0f10;   /* player: background of the current countdown */
+  --seg-fg: #f2a541;   /* player: digits of the current countdown */
+  --seg-ink: #d9dedf;  /* player: text on the current background */
+  --font-digits: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, monospace;
+  --font-ui: "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent; overflow: hidden;
+}
+[hidden] { display: none !important; }
+button { cursor: pointer; font-family: var(--font-ui); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.view {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex: none; }
+.title { font: italic 400 30px Georgia, "Times New Roman", serif; color: var(--accent); margin: 0; }
+.tools { display: flex; gap: 8px; flex: none; align-items: center; }
+.iconbtn {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  font: 600 12px var(--font-ui); letter-spacing: .08em; text-transform: uppercase;
+  padding: 7px 10px; border-radius: 6px;
+}
+.iconbtn[aria-pressed="true"] { color: var(--fg); border-color: var(--muted); }
+.info { width: 34px; padding: 7px 0; font: italic 15px Georgia, "Times New Roman", serif; text-transform: none; letter-spacing: 0; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 0 20px; }
+.small { font-size: 13px; color: var(--muted); }
+.btn {
+  background: none; border: 1px solid var(--line); color: var(--fg);
+  font: 600 13px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; padding: 9px 14px; border-radius: 8px;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border: none; }
+.btn.danger.armed { background: #7a2a2a; border-color: #7a2a2a; color: #fff; }
+.mini {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  width: 36px; height: 36px; border-radius: 8px; font: 400 16px var(--font-ui); padding: 0; flex: none;
+}
+.mini:disabled { opacity: .3; cursor: default; }
+.name {
+  background: none; border: none; border-bottom: 1px solid transparent; color: var(--fg);
+  font: 600 17px var(--font-ui); letter-spacing: .04em; padding: 4px 0; min-width: 0; flex: 1;
+}
+.name:focus { outline: none; border-bottom-color: var(--accent); }
+
+/* ---- Library ---- */
+.wl { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 14px; }
+.wlhead { display: flex; align-items: center; gap: 6px; }
+.wlhead .name { text-transform: uppercase; letter-spacing: .1em; font-size: 15px; }
+.wlhead .wlstart { height: 36px; padding: 0 12px; flex: none; }
+.btn:disabled { opacity: .35; cursor: default; }
+/* Start of a single work: the same accent as Start of a worklist */
+.mini.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 14px; }
+.works { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.work { display: flex; align-items: center; gap: 8px; }
+.workbody {
+  flex: 1; min-width: 0; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--fg); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;
+}
+.workbody .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.workbody .wname { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbody .total { font: 13px var(--font-digits); color: var(--muted); flex: none; }
+.workbody .durs { font: 13px var(--font-digits); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.strip span { min-width: 3px; border-bottom: 3px solid; }
+.wlfoot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
+.wlfoot div { display: flex; gap: 8px; }
+.empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
+.libfoot { display: flex; gap: 10px; padding-top: 6px; flex: none; }
+.libfoot .btn { flex: 1; height: 48px; }
+
+/* ---- Editor ---- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field > label, .lbl { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.segs { display: flex; flex-direction: column; gap: 10px; }
+.seg { border-radius: 12px; border: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.segtop { display: flex; align-items: center; gap: 8px; }
+.segnum { font: 600 13px var(--font-digits); width: 28px; flex: none; }
+.dur { display: flex; align-items: center; gap: 4px; flex: 1; }
+.dur input {
+  width: 3.4ch; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
+  color: inherit; text-align: center; font: 400 24px var(--font-digits); padding: 2px 0;
+}
+.dur b { font: 400 24px var(--font-digits); }
+.segcol { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pick { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); overflow: hidden; flex: none; }
+.pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
+.pick span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 10px var(--font-ui); letter-spacing: .06em; pointer-events: none; }
+.pairs { display: flex; gap: 6px; flex-wrap: wrap; }
+.pair { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); padding: 0; }
+.addseg { margin-top: 12px; width: 100%; height: 48px; }
+.radio { display: flex; gap: 8px; }
+.radio button { flex: 1; }
+.radio button[aria-checked="true"] { border-color: var(--accent); color: var(--accent); }
+.edfoot { display: flex; gap: 10px; padding-top: 6px; flex: none; flex-wrap: wrap; }
+.edfoot .btn { flex: 1; height: 48px; }
+
+/* ---- Player (Élan layout) ---- */
+#player { background: var(--seg-bg); color: var(--seg-ink); padding-block: 10px; transition: background .15s; }
+#player .iconbtn, #player .phase { color: color-mix(in srgb, var(--seg-ink) 65%, transparent); border-color: color-mix(in srgb, var(--seg-ink) 25%, transparent); }
+#player .iconbtn[aria-pressed="true"] { color: var(--seg-ink); border-color: color-mix(in srgb, var(--seg-ink) 65%, transparent); }
+.phase { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
+.phase span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phase i { width: 9px; height: 9px; border-radius: 50%; background: var(--seg-fg); flex: none; box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-ink) 30%, transparent); }
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.fit { flex: 1; min-height: 0; width: 100%; position: relative; overflow: hidden; }
+#digits { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+#player.paused #digits { opacity: .45; }
+.psetup { width: 100%; max-width: 560px; }
+.psetup .mid { display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.psetup .durs { font: 13px var(--font-digits); opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* title of the work, as large as the box allows (size set by fitTitle) */
+.ttl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+/* upright sans serif: from a distance it reads better than an italic */
+#ttl { font: 600 40px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--seg-fg); text-align: center; line-height: 1.1;
+       overflow-wrap: normal; word-break: normal; width: 96%; padding: 0 .1em; }
+#ttl.blink { animation: tblink .32s steps(1, end) 5; }
+@keyframes tblink { 0% { opacity: 0; } 50% { opacity: 1; } }
+#player[data-mode="title"] #digits, #player[data-mode="end"] #digits { display: none; }
+#player[data-mode="run"] .ttl, #player[data-mode="run"] .psetup,
+#player[data-mode="done"] .ttl, #player[data-mode="done"] .psetup { display: none; }
+#player[data-mode="end"] #ttl { color: var(--seg-ink); opacity: .55; }
+.controls { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding-top: 10px; flex: none; }
+#player[data-mode="title"] .controls { grid-template-columns: 1fr 2fr 1fr; }
+#player:not([data-mode="title"]) #nextWork { display: none; }
+/* a single work: no previous or next on its title, Start only */
+#player[data-list="0"][data-mode="title"] .controls { grid-template-columns: 1fr; }
+#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"] #nextWork { display: none; }
+#nextWork { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
+.controls button:disabled { opacity: .35; cursor: default; }
+.controls button { height: 58px; border-radius: 10px; font: 600 17px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
+#reset { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
+#main { background: var(--seg-fg); border: none; color: var(--seg-bg); }
+#player.paused #main { background: var(--seg-ink); color: var(--seg-bg); }
+#player.immersive { padding-block: 0; }
+#player.immersive .top, #player.immersive .controls { display: none; }
+.hint {
+  position: fixed; left: 0; right: 0; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  text-align: center; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; pointer-events: none;
+}
+
+/* ---- Dialogs ---- */
+.dialog {
+  position: fixed; inset: 0; z-index: 20; display: flex; overflow-y: auto;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; color: var(--fg);
+  padding: 24px; max-width: 360px; width: 100%; margin: auto; display: flex; flex-direction: column; gap: 14px;
+}
+.card h2 { margin: 0; font: italic 400 36px Georgia, "Times New Roman", serif; color: var(--accent); }
+.card p { margin: 0; font-size: 15px; line-height: 1.5; }
+.card a { color: var(--run); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--run) 40%, transparent); }
+.card .ver { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: -8px; }
+.card .btn { align-self: flex-end; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30;
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: 90vw; text-align: center;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .controls button { height: 46px; }
+  .psetup .mini { width: 38px; height: 38px; }
+}
+</style></head><body>
+
+<!-- ================= Library ================= -->
+<section class="view" id="library">
+  <div class="top">
+    <h1 class="title">Relais</h1>
+    <div class="tools">
+      <button class="iconbtn" id="importBtn">Import</button>
+      <button class="iconbtn" id="exportAll">Export</button>
+      <button class="iconbtn info" id="infoBtn" aria-label="About">i</button>
+    </div>
+  </div>
+  <div class="scroll" id="libList"></div>
+  <div class="libfoot"><button class="btn" id="newWl">+ New worklist</button></div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+</section>
+
+<!-- ================= Editor ================= -->
+<section class="view" id="editor" hidden>
+  <div class="top">
+    <button class="iconbtn" id="edBack">‹ Worklists</button>
+    <span class="small" id="edWhere"></span>
+  </div>
+  <div class="scroll">
+    <div class="field">
+      <label for="edName">Work</label>
+      <input class="name" id="edName" maxlength="60" style="font-size:22px">
+    </div>
+    <div class="lbl" style="margin-bottom:8px">Countdowns <span id="edTotal" style="font-family:var(--font-digits);letter-spacing:0;text-transform:none"></span></div>
+    <div class="segs" id="segs"></div>
+    <button class="btn addseg" id="addSeg">+ Add countdown</button>
+  </div>
+  <div class="edfoot">
+    <button class="btn danger" id="edDelete">Delete</button>
+    <button class="btn" id="edDup">Duplicate</button>
+    <button class="btn primary" id="edPlay">▶ Start</button>
+  </div>
+</section>
+
+<!-- ================= Player ================= -->
+<section class="view" id="player" hidden>
+  <div class="top">
+    <div class="phase"><i></i><span id="phaseLabel"></span></div>
+    <div class="tools">
+      <button class="iconbtn" id="plBack">Worklists</button>
+      <button class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound and vibration at each change">Sound</button>
+      <button class="iconbtn" id="full">Full screen</button>
+    </div>
+  </div>
+  <div class="stage" id="stage">
+    <div class="fit" id="fit">
+      <canvas id="digits" role="img" aria-label="00:00"></canvas>
+      <!-- title screen: the name of the work, static until the pedal starts it -->
+      <div class="ttl" id="ttlBox"><div id="ttl" role="heading" aria-level="1"></div></div>
+    </div>
+    <div class="psetup" id="psetup">
+      <div class="mid">
+        <div class="strip" id="plStrip"></div>
+        <div class="durs" id="plDurs"></div>
+      </div>
+    </div>
+  </div>
+  <div class="controls" id="controls">
+    <button id="reset">Reset</button>
+    <button id="main">Start</button>
+    <button id="nextWork">Next ›</button>
+  </div>
+  <div class="hint" id="hint" hidden>Tap for controls</div>
+</section>
+
+<div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
+  <div class="card">
+    <h2 id="abTitle">Relais</h2>
+    <div class="ver">Version 0.3.0</div>
+    <p>Sequential countdowns: each one starts by itself when the previous one ends, with its own colours.</p>
+    <p>A worklist is a set list: each work opens on its title, and when its last countdown ends the title of the next work appears.</p>
+    <p>Start a single work with its own ▶: it stops at 00:00 when its last countdown ends. Start a worklist to play it as a set list.</p>
+    <p><strong>Bluetooth pedal.</strong> On a title, right starts the countdown. On a countdown, right is Pause and Resume, left is Reset to the title.</p>
+    <p>Designed and built by Alessandro Ciccarelli.<br><a href="https://alessandrociccarelli.com" target="_blank" rel="noopener">alessandrociccarelli.com</a></p>
+    <p class="small">© 2026. Free software under the MIT License. Works offline and collects no data.</p>
+    <button class="btn" id="abClose">Close</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const body = document.body;
+
+  // ================= Data =================
+  // library = { worklists: [ { id, name, works: [ { id, name, segments: [ {s, bg, fg} ] } ] } ] }
+  // In the player a worklist is a set list: at the end of a work the title of the next one appears.
+  // s = length in seconds; bg, fg = background and digit colours (#rrggbb).
+  const STORE = 'relais-library-v1';
+  const FORMAT = 'relais-worklists';
+  const MAX_S = 999 * 60 + 59, MAX_SEGS = 99, MAX_NAME = 60;
+  // background / digit pairs offered in the editor; new countdowns take them in turn so they differ at a glance
+  // (consecutive pairs never share the background)
+  const PAIRS = [
+    ['#0d0f10', '#f2a541'], ['#0b1a33', '#6fb7ff'], ['#3a0d12', '#f3efe6'], ['#14301f', '#4cff7a'],
+    ['#2a0f33', '#ff6ad5'], ['#f3efe6', '#111111'], ['#ffe45c', '#111111'], ['#9fe3d6', '#08201c'],
+    ['#0d0f10', '#9fe3d6'], ['#2b1608', '#ff4d3d']
+  ];
+  const HEX = /^#[0-9a-f]{6}$/i;
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const seg = (s, i) => ({ s, bg: PAIRS[i % PAIRS.length][0], fg: PAIRS[i % PAIRS.length][1] });
+  const mkWork = (name, secs) => ({ id: uid(), name, segments: secs.map(seg) });
+  const example = () => ({ worklists: [
+    { id: uid(), name: 'Worklist 1', works: [mkWork('Work 1', [450, 300, 900, 224]), mkWork('Work 2', [276, 416, 194])] },
+    { id: uid(), name: 'Worklist 2', works: [] }
+  ] });
+
+  // anything that comes from storage or from a file is cleaned before use
+  const clean = {
+    name: (v, d) => (typeof v === 'string' ? v : d).slice(0, MAX_NAME),
+    color: (v, d) => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : d),
+    secs: v => Math.max(1, Math.min(MAX_S, Math.round(+v) || 1)),
+    work(w, i) {
+      if (!w || typeof w !== 'object') return null;
+      const segs = (Array.isArray(w.segments) ? w.segments : []).slice(0, MAX_SEGS).map((s, k) => s && typeof s === 'object'
+        ? { s: clean.secs(s.s), bg: clean.color(s.bg, PAIRS[k % PAIRS.length][0]), fg: clean.color(s.fg, PAIRS[k % PAIRS.length][1]) } : null).filter(Boolean);
+      if (!segs.length) segs.push(seg(60, 0));
+      return { id: uid(), name: clean.name(w.name, `Work ${i + 1}`), segments: segs };
+    },
+    worklist(l, i) {
+      if (!l || typeof l !== 'object') return null;
+      return { id: uid(), name: clean.name(l.name, `Worklist ${i + 1}`),
+               works: (Array.isArray(l.works) ? l.works : []).map(clean.work).filter(Boolean) };
+    },
+    library(x) {
+      const wls = x && Array.isArray(x.worklists) ? x.worklists : null;
+      return wls ? { worklists: wls.map(clean.worklist).filter(Boolean) } : null;
+    }
+  };
+  let lib = null;
+  try { lib = clean.library(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) {}
+  if (!lib) lib = example();
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(lib)); } catch (e) {} }
+  save();
+
+  const fmtDur = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60, p = n => String(n).padStart(2, '0');
+                        return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`; };
+  const total = w => w.segments.reduce((a, s) => a + s.s, 0);
+  const findWork = id => { for (const l of lib.worklists) { const i = l.works.findIndex(w => w.id === id); if (i >= 0) return { l, i, w: l.works[i] }; } return null; };
+  const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; };
+
+  // small DOM helper: h('button', { className, onclick }, 'text', child…)
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const k in props || {}) { if (k === 'style') Object.assign(e.style, props[k]); else if (k.startsWith('aria') || k === 'role') e.setAttribute(k.replace(/^aria/, 'aria-').toLowerCase(), props[k]); else e[k] = props[k]; }
+    kids.flat().forEach(c => e.append(c));
+    return e;
+  }
+  function strip(box, w) {
+    box.textContent = '';
+    w.segments.forEach(s => box.append(h('span', { style: { flex: s.s + ' 1 0', background: s.bg, borderBottomColor: s.fg } })));
+  }
+  // a delete button that asks for a second tap within three seconds
+  function twoTap(btn, label, act) {
+    let t = 0;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('armed')) { clearTimeout(t); act(); return; }
+      btn.classList.add('armed'); btn.textContent = 'Sure?';
+      t = setTimeout(() => { btn.classList.remove('armed'); btn.textContent = label; }, 3000);
+    });
+  }
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600); }
+
+  // ================= Views =================
+  let view = 'library';
+  function go(v) {
+    view = v;
+    ['library', 'editor', 'player'].forEach(x => { $(x).hidden = x !== v; });
+    if (v === 'library') renderLibrary();
+  }
+
+  // ================= Library =================
+  function renderLibrary() {
+    const box = $('libList'); box.textContent = '';
+    lib.worklists.forEach((l, li) => {
+      const name = h('input', { className: 'name', value: l.name, maxLength: MAX_NAME, ariaLabel: 'Worklist name' });
+      name.addEventListener('input', () => { l.name = name.value; save(); });
+      const up = h('button', { className: 'mini', textContent: '▲', disabled: li === 0, ariaLabel: 'Move worklist up', onclick: () => { move(lib.worklists, li, -1); save(); renderLibrary(); } });
+      const dn = h('button', { className: 'mini', textContent: '▼', disabled: li === lib.worklists.length - 1, ariaLabel: 'Move worklist down', onclick: () => { move(lib.worklists, li, 1); save(); renderLibrary(); } });
+      const works = h('div', { className: 'works' });
+      if (!l.works.length) works.append(h('div', { className: 'empty', textContent: 'No works yet.' }));
+      l.works.forEach((w, wi) => {
+        const st = h('div', { className: 'strip' }); strip(st, w);
+        const card = h('button', { className: 'workbody', ariaLabel: `Edit ${w.name}`, onclick: () => openEditor(w.id) },
+          h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: fmtDur(total(w)) })),
+          st,
+          h('div', { className: 'durs', textContent: w.segments.map(s => fmtDur(s.s)).join(' · ') }));
+        works.append(h('div', { className: 'work' }, card,
+          h('button', { className: 'mini', textContent: '▲', disabled: wi === 0, ariaLabel: 'Move work up', onclick: () => { move(l.works, wi, -1); save(); renderLibrary(); } }),
+          h('button', { className: 'mini', textContent: '▼', disabled: wi === l.works.length - 1, ariaLabel: 'Move work down', onclick: () => { move(l.works, wi, 1); save(); renderLibrary(); } }),
+          h('button', { className: 'mini go wkstart', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => openPlayer(w.id, false) })));
+      });
+      const del = h('button', { className: 'btn danger' });
+      twoTap(del, 'Delete', () => { lib.worklists.splice(li, 1); save(); renderLibrary(); });
+      box.append(h('div', { className: 'wl' },
+        h('div', { className: 'wlhead' }, name, up, dn,
+          h('button', { className: 'btn primary wlstart', textContent: '▶ Start', disabled: !l.works.length, ariaLabel: `Start the worklist ${l.name}`,
+                        onclick: () => openPlayer(l.works[0].id, true) })),
+        works,
+        h('div', { className: 'wlfoot' },
+          h('button', { className: 'btn', textContent: '+ Work', onclick: () => {
+            const w = mkWork(`Work ${l.works.length + 1}`, [300]); l.works.push(w); save(); openEditor(w.id);
+          } }),
+          h('div', {}, h('button', { className: 'btn', textContent: 'Export', onclick: () => exportJson({ worklists: [l] }, l.name) }), del))));
+    });
+    if (!lib.worklists.length) box.append(h('div', { className: 'empty', textContent: 'No worklists. Create one, or import a file.' }));
+  }
+  $('newWl').addEventListener('click', () => {
+    lib.worklists.push({ id: uid(), name: `Worklist ${lib.worklists.length + 1}`, works: [] }); save(); renderLibrary();
+    const s = $('libList'); s.scrollTop = s.scrollHeight;
+  });
+
+  // ---- import / export: a JSON file with one or more worklists ----
+  // In the browser: download and file picker. In the Android app the page will hand the file to the app
+  // (window.Android.saveFile / openFile), still to be written.
+  function exportJson(data, name) {
+    const out = { format: FORMAT, version: 1, exported: new Date().toISOString(),
+                  worklists: data.worklists.map(l => ({ name: l.name, works: l.works.map(w => ({ name: w.name, segments: w.segments })) })) };
+    const text = JSON.stringify(out, null, 2);
+    const file = (name || 'worklists').replace(/[^\w.-]+/g, '_').slice(0, 40) + '.json';
+    if (window.Android && Android.saveFile) { Android.saveFile(file, text); return; }
+    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: file });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function importText(text) {
+    let x = null;
+    try { x = clean.library(JSON.parse(text)); } catch (e) {}
+    if (!x || !x.worklists.length) { toast('This file holds no worklists.'); return; }
+    lib.worklists.push(...x.worklists); save(); renderLibrary();
+    const n = x.worklists.length, m = x.worklists.reduce((a, l) => a + l.works.length, 0);
+    toast(`Imported ${n} worklist${n > 1 ? 's' : ''}, ${m} work${m === 1 ? '' : 's'}.`);
+  }
+  window.relaisImport = importText; // entry point for the Android app
+  $('exportAll').addEventListener('click', () => exportJson(lib, 'worklists'));
+  $('importBtn').addEventListener('click', () => { if (window.Android && Android.openFile) Android.openFile(); else $('importFile').click(); });
+  $('importFile').addEventListener('change', e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    if (f.size > 1e6) { toast('File too large.'); return; }
+    f.text().then(importText);
+  });
+
+  // ================= Editor =================
+  let edId = null;
+  function openEditor(id) { edId = id; renderEditor(); go('editor'); $('editor').querySelector('.scroll').scrollTop = 0; }
+  function colorPick(label, value, onchange) {
+    const inp = h('input', { type: 'color', value });
+    const tag = h('span', { textContent: label });
+    const box = h('label', { className: 'pick', style: { background: value } }, inp, tag);
+    tag.style.color = ink(value);
+    inp.addEventListener('input', () => { box.style.background = inp.value; tag.style.color = ink(inp.value); onchange(inp.value); });
+    return box;
+  }
+  function renderEditor() {
+    const f = findWork(edId); if (!f) { go('library'); return; }
+    const w = f.w;
+    $('edName').value = w.name;
+    $('edWhere').textContent = f.l.name;
+    $('edTotal').textContent = '· ' + fmtDur(total(w));
+    const box = $('segs'); box.textContent = '';
+    w.segments.forEach((s, i) => {
+      const row = h('div', { className: 'seg', style: { background: s.bg, color: s.fg } });
+      const mi = h('input', { inputMode: 'numeric', maxLength: 3, value: Math.floor(s.s / 60), ariaLabel: `Minutes of countdown ${i + 1}` });
+      const se = h('input', { inputMode: 'numeric', maxLength: 2, value: String(s.s % 60).padStart(2, '0'), ariaLabel: `Seconds of countdown ${i + 1}` });
+      const upd = () => {
+        mi.value = mi.value.replace(/\D/g, ''); se.value = se.value.replace(/\D/g, '');
+        s.s = clean.secs(Math.min(999, +mi.value || 0) * 60 + Math.min(59, +se.value || 0)); save();
+        $('edTotal').textContent = '· ' + fmtDur(total(w));
+      };
+      mi.addEventListener('input', upd); se.addEventListener('input', upd);
+      se.addEventListener('blur', () => { se.value = String(s.s % 60).padStart(2, '0'); mi.value = Math.floor(s.s / 60); });
+      const recolor = () => { row.style.background = s.bg; row.style.color = s.fg; save(); };
+      const pairs = h('div', { className: 'pairs' }, PAIRS.map(([bg, fg]) => h('button', {
+        className: 'pair', ariaLabel: 'Colour pair', style: { background: `linear-gradient(135deg, ${bg} 50%, ${fg} 50%)` },
+        onclick: () => { s.bg = bg; s.fg = fg; save(); renderEditor(); } })));
+      row.append(
+        h('div', { className: 'segtop' },
+          h('span', { className: 'segnum', textContent: String(i + 1).padStart(2, '0') }),
+          h('div', { className: 'dur' }, mi, h('b', { textContent: ':' }), se),
+          h('button', { className: 'mini', textContent: '▲', disabled: i === 0, ariaLabel: 'Move up', style: { color: s.fg }, onclick: () => { move(w.segments, i, -1); save(); renderEditor(); } }),
+          h('button', { className: 'mini', textContent: '▼', disabled: i === w.segments.length - 1, ariaLabel: 'Move down', style: { color: s.fg }, onclick: () => { move(w.segments, i, 1); save(); renderEditor(); } }),
+          h('button', { className: 'mini', textContent: '⧉', ariaLabel: 'Duplicate', disabled: w.segments.length >= MAX_SEGS, style: { color: s.fg }, onclick: () => { w.segments.splice(i + 1, 0, { ...s }); save(); renderEditor(); } }),
+          h('button', { className: 'mini', textContent: '✕', ariaLabel: 'Remove', disabled: w.segments.length === 1, style: { color: s.fg }, onclick: () => { w.segments.splice(i, 1); save(); renderEditor(); } })),
+        h('div', { className: 'segcol' },
+          colorPick('BG', s.bg, v => { s.bg = v; recolor(); }),
+          colorPick('123', s.fg, v => { s.fg = v; recolor(); }),
+          pairs));
+      box.append(row);
+    });
+    $('addSeg').disabled = w.segments.length >= MAX_SEGS;
+  }
+  $('edName').addEventListener('input', () => { const f = findWork(edId); if (f) { f.w.name = $('edName').value; save(); } });
+  $('addSeg').addEventListener('click', () => { const f = findWork(edId); if (!f) return; f.w.segments.push(seg(60, f.w.segments.length)); save(); renderEditor();
+    const sc = $('editor').querySelector('.scroll'); sc.scrollTop = sc.scrollHeight; });
+  $('edBack').addEventListener('click', () => go('library'));
+  $('edPlay').addEventListener('click', () => openPlayer(edId, false));
+  $('edDup').addEventListener('click', () => {
+    const f = findWork(edId); if (!f) return;
+    const c = JSON.parse(JSON.stringify(f.w)); c.id = uid(); c.name = (f.w.name + ' copy').slice(0, MAX_NAME);
+    f.l.works.splice(f.i + 1, 0, c); save(); openEditor(c.id); toast('Duplicated.');
+  });
+  twoTap($('edDelete'), 'Delete', () => { const f = findWork(edId); if (f) { f.l.works.splice(f.i, 1); save(); } go('library'); });
+
+  // ================= Seven-segment digits (Élan's drawing) =================
+  const SEG = { 0:'abcdef', 1:'bc', 2:'abged', 3:'abgcd', 4:'fgbc', 5:'afgcd', 6:'afgedc', 7:'abc', 8:'abcdefg', 9:'abcdfg' };
+  const DW = 0.58, GAP = 0.13, CW = 0.30, ROWGAP = 0.16, SKEW = 0.07; // proportions of the digit height
+  const rowUnits = s => [...s].reduce((u, ch, i) => u + (ch === ':' ? CW : DW) + (i ? GAP : 0), 0) + SKEW;
+  function drawDigit(ctx, x, y, h, d, on, off) {
+    const w = DW * h, t = 0.13 * h, g = t * 0.14;
+    const L = x + t / 2, R = x + w - t / 2, T = y + t / 2, M = y + h / 2, B = y + h - t / 2;
+    const hz = (x0, x1, yy) => [[x0 + g, yy], [x0 + g + t / 2, yy - t / 2], [x1 - g - t / 2, yy - t / 2], [x1 - g, yy], [x1 - g - t / 2, yy + t / 2], [x0 + g + t / 2, yy + t / 2]];
+    const vt = (xx, y0, y1) => [[xx, y0 + g], [xx + t / 2, y0 + g + t / 2], [xx + t / 2, y1 - g - t / 2], [xx, y1 - g], [xx - t / 2, y1 - g - t / 2], [xx - t / 2, y0 + g + t / 2]];
+    const segs = { a: hz(L, R, T), g: hz(L, R, M), d: hz(L, R, B), f: vt(L, T, M), b: vt(R, T, M), e: vt(L, M, B), c: vt(R, M, B) };
+    const lit = SEG[d] || '';
+    for (const k in segs) {
+      ctx.fillStyle = lit.includes(k) ? on : off;
+      ctx.beginPath();
+      segs[k].forEach(([px, py], i) => { const sx = px + (y + h - py) * SKEW; i ? ctx.lineTo(sx, py) : ctx.moveTo(sx, py); });
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  function drawColon(ctx, x, y, h, on) {
+    const s = 0.13 * h, cx = x + CW * h / 2 - s / 2;
+    ctx.fillStyle = on;
+    [0.3, 0.7].forEach(p => { const py = y + h * p - s / 2; ctx.fillRect(cx + (y + h - py - s / 2) * SKEW, py, s, s); });
+  }
+  // unlit segments: the digit colour, faint, so they show on dark and light backgrounds alike
+  const ghost = hex => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},0.07)`; };
+  function ink(hex) {
+    const n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.5 ? '#111111' : '#f5f5f5';
+  }
+  const digits = $('digits'), fitBox = $('fit');
+  let cur = { text: '00:00', fg: '#f2a541', lit: true };
+  function draw() {
+    const W = fitBox.clientWidth, H = fitBox.clientHeight;
+    if (!W || !H) return;
+    const dpr = window.devicePixelRatio || 1;
+    if (digits.width !== Math.round(W * dpr) || digits.height !== Math.round(H * dpr)) { digits.width = Math.round(W * dpr); digits.height = Math.round(H * dpr); }
+    const ctx = digits.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const text = cur.text, MINSX = 0.55;
+    const layout = rows => {
+      const n = rows.length, u = Math.max(...rows.map(rowUnits));
+      let hh = H * 0.96 / (n + (n - 1) * ROWGAP), sx = Math.min(1, W * 0.97 / (u * hh));
+      if (sx < MINSX) { sx = MINSX; hh = W * 0.97 / (u * MINSX); }
+      return { rows, h: hh, sx, score: hh * Math.sqrt(sx) };
+    };
+    const A = layout([text]), Bl = layout(text.split(':').length === 2 ? text.split(':') : [text]);
+    const { rows, h: hh, sx } = Bl.score > A.score * 1.1 ? Bl : A;
+    // blinking: the lit segments go dark for a moment, the unlit ones stay
+    const off = ghost(cur.fg), on = cur.lit ? cur.fg : off;
+    let y = (H - (rows.length * hh + (rows.length - 1) * ROWGAP * hh)) / 2;
+    for (const r of rows) {
+      ctx.save(); ctx.translate((W - rowUnits(r) * hh * sx) / 2, 0); ctx.scale(sx, 1);
+      let x = 0;
+      [...r].forEach((ch, i) => {
+        if (i) x += GAP * hh;
+        if (ch === ':') { drawColon(ctx, x, y, hh, on); x += CW * hh; } else { drawDigit(ctx, x, y, hh, +ch, on, off); x += DW * hh; }
+      });
+      ctx.restore(); y += hh * (1 + ROWGAP);
+    }
+  }
+  new ResizeObserver(() => { draw(); fitTitle(); }).observe(fitBox);
+  window.addEventListener('orientationchange', () => setTimeout(draw, 250));
+
+  // ================= Player =================
+  // Time is always computed from the system clock: elapsed = now - startAt, minus the pauses.
+  // The current countdown is found from the elapsed time and the cumulative lengths, so a frame
+  // that comes late, or a phone that slows the page down, never shifts the sequence.
+  const pl = $('player'), mainB = $('main'), label = $('phaseLabel'), hint = $('hint');
+  // Blinking in time: for the first BLINK_BEATS seconds of a new countdown the digits are lit in the
+  // first part of every second and dark in the rest. Every new value appears lit at the instant it
+  // changes, so the count is never hidden (the earlier 160 ms flicker masked the change of second).
+  const BLINK_BEATS = 3, BLINK_ON = 550;
+  const blinkLit = since => !(since >= 0 && since < BLINK_BEATS * 1000 && since % 1000 >= BLINK_ON);
+  let P = null, raf = 0, sound = false, audio = null, wake = null, hideTimer = 0;
+  const fmt = t => { const hh = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60, p = n => String(n).padStart(2, '0');
+                     return hh ? `${hh}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`; };
+
+  // Two ways to play, both opening on the title of a work, static until the pedal starts it.
+  // A worklist (Start of the worklist) is a set list: when the last countdown of a work ends, the
+  // title of the next work appears, and after the last work a closing screen.
+  // A single work (its own Start) stops at 00:00 when its last countdown ends.
+  // Modes: 'title' (name of the work), 'run' (countdowns), 'done' (single work over, 00:00),
+  // 'end' (end of the worklist).
+  function openPlayer(id, asList) {
+    const f = findWork(id); if (!f) return;
+    P = { l: f.l, list: !!asList, seq: asList ? f.l.works : [f.w], i: asList ? f.i : 0,
+          mode: 'title', startAt: 0, pausedAt: null, idx: 0, blinkAt: -1e9 };
+    pl.dataset.list = asList ? '1' : '0';
+    go('player'); keepAwake(); toTitle(P.i, false);
+  }
+  function load(i) {
+    const w = P.seq[i];
+    P.i = i; P.w = JSON.parse(JSON.stringify(w));
+    P.cum = [0]; P.w.segments.forEach(s => P.cum.push(P.cum[P.cum.length - 1] + s.s * 1000));
+  }
+  function setMode(m) { P.mode = m; pl.dataset.mode = m; }
+  function stopClock() {
+    cancelAnimationFrame(raf); clearTimeout(hideTimer);
+    P.pausedAt = null; P.idx = 0; P.blinkAt = -1e9; pl.classList.remove('paused');
+  }
+  function colors(bg, fg) {
+    const ps = pl.style;
+    ps.setProperty('--seg-bg', bg); ps.setProperty('--seg-fg', fg); ps.setProperty('--seg-ink', ink(bg));
+  }
+  // the title as large as the box allows, on more lines if needed; a word is never split
+  function fitTitle() {
+    const box = $('ttlBox'), el = $('ttl'), W = box.clientWidth, H = box.clientHeight;
+    if (!W || !H || !el.textContent) return;
+    let lo = 10, hi = Math.max(10, Math.min(W, H) * 1.2);
+    for (let k = 0; k < 16; k++) {
+      const mid = (lo + hi) / 2; el.style.fontSize = mid + 'px';
+      // fits when no word sticks out of the line (scrollWidth) and the lines fit the height
+      if (el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= H * 0.9) lo = mid; else hi = mid;
+    }
+    el.style.fontSize = Math.floor(lo) + 'px';
+  }
+  function setTitle(text, blink) {
+    const el = $('ttl');
+    el.textContent = text; fitTitle();
+    el.classList.remove('blink');
+    if (blink) { void el.offsetWidth; el.classList.add('blink'); }
+  }
+  function toTitle(i, blink) {
+    stopClock(); load(i); setMode('title');
+    const s0 = P.w.segments[0], n = P.seq.length;
+    colors(s0.bg, s0.fg);
+    setTitle(P.w.name, blink);
+    strip($('plStrip'), P.w);
+    $('plDurs').textContent = P.w.segments.map(s => fmtDur(s.s)).join(' · ') + ' = ' + fmtDur(total(P.w));
+    label.textContent = P.list ? `${i + 1}/${n} · ${P.l.name}` : 'Ready';
+    $('reset').textContent = '‹ Prev'; $('reset').disabled = i === 0;
+    $('nextWork').disabled = i === n - 1;
+    mainB.textContent = 'Start'; mainB.disabled = false;
+    immerse();
+  }
+  function toEnd() {
+    stopClock(); setMode('end');
+    colors('#0d0f10', '#f2a541');
+    setTitle('End', true);
+    const n = P.seq.length;
+    $('plStrip').textContent = '';
+    $('plDurs').textContent = `${n} work${n > 1 ? 's' : ''} · ${fmtDur(P.seq.reduce((a, w) => a + total(w), 0))}`;
+    label.textContent = `End · ${P.l.name}`;
+    $('reset').textContent = '‹ Back'; $('reset').disabled = false;
+    mainB.textContent = 'End'; mainB.disabled = true;
+    immerse();
+  }
+  const now = () => P.pausedAt ?? Date.now();
+  // what to show after `el` ms: index of the countdown (n = the work is over), text, colours
+  function at(el) {
+    const c = P.cum, segs = P.w.segments, n = segs.length;
+    if (el >= c[n]) return { i: n };
+    let i = 0; while (el >= c[i + 1]) i++;
+    return { i, text: fmt(Math.ceil((c[i + 1] - el) / 1000)), bg: segs[i].bg, fg: segs[i].fg };
+  }
+  function render() {
+    const t = now(), n = P.w.segments.length;
+    let st;
+    if (P.mode === 'run') {
+      st = at(t - P.startAt);
+      if (st.i >= n) { // last countdown over
+        signal();
+        if (P.list) { if (P.i + 1 < P.seq.length) toTitle(P.i + 1, true); else toEnd(); return; }
+        // a single work stops at 00:00, blinking in time like any change
+        setMode('done'); P.blinkAt = P.startAt + P.cum[n];
+        mainB.textContent = 'End'; mainB.disabled = true; immerse();
+      } else if (st.i !== P.idx) {
+        // a new countdown has begun while watching: blink, and tone / vibration if Sound is on
+        if (st.i > P.idx) { P.blinkAt = P.startAt + P.cum[st.i]; signal(); }
+        P.idx = st.i;
+      }
+    }
+    if (P.mode === 'done') { const s = P.w.segments[n - 1]; st = { i: n - 1, text: fmt(0), bg: s.bg, fg: s.fg }; }
+    const lit = blinkLit(t - P.blinkAt);
+    colors(st.bg, st.fg);
+    if (cur.text !== st.text || cur.fg !== st.fg || cur.lit !== lit) {
+      cur = { text: st.text, fg: st.fg, lit }; digits.setAttribute('aria-label', st.text); draw();
+    }
+    label.textContent = P.mode === 'done' ? `End · ${P.w.name}`
+                      : P.pausedAt !== null ? `Paused · ${st.i + 1}/${n}` : `${st.i + 1}/${n} · ${P.w.name}`;
+  }
+  function loop() {
+    render();
+    const blinking = P.mode === 'done' && now() - P.blinkAt < BLINK_BEATS * 1000 + 100;
+    if ((P.mode === 'run' && P.pausedAt === null) || blinking) raf = requestAnimationFrame(loop);
+  }
+
+  function signal() {
+    if (!sound) return;
+    beep();
+    try { if (window.Android && Android.vibrate) Android.vibrate(200); else if (navigator.vibrate) navigator.vibrate([200, 80, 200]); } catch (e) {}
+  }
+  function unlockAudio() {
+    try { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) { audio = null; }
+  }
+  function beep() {
+    if (!sound || !audio) return;
+    const t0 = audio.currentTime;
+    [0, .28].forEach((d, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'sine'; o.frequency.value = i ? 1320 : 880;
+      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(.4, t0 + d + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + d + .45);
+      o.connect(g).connect(audio.destination); o.start(t0 + d); o.stop(t0 + d + .5);
+    });
+  }
+  // the screen stays on for as long as the player is open, titles included
+  async function keepAwake() { try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && view === 'player') keepAwake(); });
+
+  // controls hidden while time runs; a tap brings them back for four seconds
+  function immerse() {
+    clearTimeout(hideTimer);
+    if (!P || P.mode !== 'run' || P.pausedAt !== null) { pl.classList.remove('immersive'); hint.hidden = true; draw(); fitTitle(); return; }
+    pl.classList.add('immersive'); hint.hidden = false;
+    setTimeout(() => { hint.hidden = true; }, 2500);
+    draw();
+  }
+  function revealControls() { pl.classList.remove('immersive'); hint.hidden = true; draw(); clearTimeout(hideTimer); hideTimer = setTimeout(immerse, 4000); }
+
+  function start() {
+    unlockAudio(); stopClock();
+    setMode('run'); P.startAt = Date.now();
+    mainB.textContent = 'Pause'; $('reset').textContent = 'Reset'; $('reset').disabled = false;
+    cur = { text: '', fg: '', lit: true };
+    keepAwake(); loop(); immerse(); goFull();
+  }
+  function pause() { P.pausedAt = Date.now(); pl.classList.add('paused'); mainB.textContent = 'Resume'; cancelAnimationFrame(raf); render(); immerse(); }
+  function resume() {
+    unlockAudio(); const d = Date.now() - P.pausedAt;
+    P.startAt += d; P.blinkAt += d; P.pausedAt = null;
+    pl.classList.remove('paused'); mainB.textContent = 'Pause'; loop(); immerse();
+  }
+  // the two pedals, and the two buttons that mirror them
+  function mainAction() {
+    if (!P) return;
+    if (P.mode === 'title') start();
+    else if (P.mode === 'run') P.pausedAt !== null ? resume() : pause();
+    // single work over, or end of the worklist: forward does nothing
+  }
+  // the left button: previous work on a title of a worklist, otherwise the same as the left pedal
+  function backButton() {
+    if (P && P.mode === 'title') { if (P.list && P.i > 0) toTitle(P.i - 1, false); }
+    else backAction();
+  }
+  // the left pedal: nothing on a title (a stray press on stage must not change the work)
+  function backAction() {
+    if (!P) return;
+    if (P.mode === 'title') return;
+    else if (P.mode === 'run' || P.mode === 'done') toTitle(P.i, false);       // reset: back to the title of this work
+    else toTitle(P.seq.length - 1, false);                                    // from the end of the list: last work
+  }
+  mainB.addEventListener('click', mainAction);
+  $('reset').addEventListener('click', backButton);
+  $('nextWork').addEventListener('click', () => { if (P && P.list && P.mode === 'title' && P.i + 1 < P.seq.length) toTitle(P.i + 1, false); });
+  $('plBack').addEventListener('click', () => {
+    if (P) stopClock();
+    try { wake && wake.release(); } catch (e) {} wake = null;
+    exitFull(); go('library');
+  });
+  $('stage').addEventListener('click', () => {
+    if (!P || P.mode !== 'run' || P.pausedAt !== null) return;
+    if (pl.classList.contains('immersive')) revealControls(); else immerse();
+  });
+  $('sound').addEventListener('click', e => { sound = !sound; e.currentTarget.setAttribute('aria-pressed', sound); if (sound) { unlockAudio(); beep(); } });
+
+  // Bluetooth page-turner pedal, as in Élan. Right (forward): Start on a title, Pause and Resume on
+  // a countdown. Left (back): Reset to the title of the work; nothing on a title. Only in the player.
+  const PEDAL_MAIN = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
+  const PEDAL_BACK = ['ArrowLeft', 'ArrowUp', 'PageUp'];
+  const pedalOn = () => view === 'player' && $('about').hidden;
+  document.addEventListener('keydown', e => {
+    if (!pedalOn() || e.ctrlKey || e.altKey || e.metaKey) return;
+    const toMain = PEDAL_MAIN.includes(e.key), toBack = PEDAL_BACK.includes(e.key);
+    if (!toMain && !toBack) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (document.activeElement && document.activeElement !== body) document.activeElement.blur();
+    toMain ? mainAction() : backAction();
+  }, true);
+  document.addEventListener('keyup', e => { if (e.key === ' ' && pedalOn()) e.preventDefault(); }, true);
+
+  // full screen: on Start, or from the button (inside the Android app the app handles it)
+  const isFull = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function goFull() {
+    if (window.Android || isFull()) return;
+    const el = document.documentElement;
+    try { const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen && el.webkitRequestFullscreen(); p && p.catch && p.catch(() => {}); } catch (e) {}
+  }
+  function exitFull() { try { if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
+  $('full').addEventListener('click', () => { isFull() ? exitFull() : goFull(); });
+  document.addEventListener('fullscreenchange', () => { $('full').textContent = isFull() ? 'Exit' : 'Full screen'; setTimeout(draw, 150); });
+  if (window.Android) $('full').hidden = true;
+
+  // About
+  $('infoBtn').addEventListener('click', () => { $('about').hidden = false; $('abClose').focus(); });
+  $('abClose').addEventListener('click', () => { $('about').hidden = true; });
+  $('about').addEventListener('click', e => { if (e.target.id === 'about') $('about').hidden = true; });
+
+  // the Android back button: player → library, editor → library
+  window.relaisBack = () => { if (view === 'player') { $('plBack').click(); return true; } if (view === 'editor') { go('library'); return true; } return false; };
+
+  go('library');
+})();
+</script>
+</body></html>
