@@ -31,6 +31,7 @@ From left: the worklists; editing a work; the title of a work, waiting for the p
 - **Silent by default.** Sound starts off every time the player opens. Turn it on to get a double tone and a vibration at each change.
 - **Screen stays on** for as long as the app is open.
 - **Works offline.** The app does not request internet access and collects no data.
+- **Instructions at hand.** The "i" icon at the top of the worklists explains works and worklists, the seek bar, the pedal and export and import, and shows the version and the author.
 
 Time is always computed from the system clock rather than by counting ticks, so it stays accurate even if the phone slows the app down.
 

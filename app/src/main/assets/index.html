@@ -185,6 +185,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 .card h2 { margin: 0; font: italic 400 36px Georgia, "Times New Roman", serif; color: var(--accent); }
 .card p { margin: 0; font-size: 15px; line-height: 1.5; }
 .card a { color: var(--run); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--run) 40%, transparent); }
+.card h3 { margin: 6px 0 -6px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.card hr { border: none; border-top: 1px solid var(--line); margin: 4px 0 0; width: 100%; }
 .card .ver { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: -8px; }
 .card .btn { align-self: flex-end; }
 .toast {
@@ -280,12 +282,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 <div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
   <div class="card">
     <h2 id="abTitle">Relais</h2>
-    <div class="ver">Version 0.4.0</div>
+    <div class="ver">Version 0.4.1</div>
     <p>Sequential countdowns: each one starts by itself when the previous one ends, with its own colours.</p>
-    <p>A worklist is a set list: each work opens on its title, and when its last countdown ends the title of the next work appears.</p>
-    <p>On the title of a work, the coloured bar works like the progress bar of an audio player: move the head to start from any point.</p>
-    <p>Start a single work with its own ▶: it stops at 00:00 when its last countdown ends. Start a worklist to play it as a set list.</p>
-    <p><strong>Bluetooth pedal.</strong> On a title, right starts the countdown. On a countdown, right is Pause and Resume, left is Reset to the title.</p>
+    <h3>Works and worklists</h3>
+    <p>Tap a work to edit its countdowns. ▶ next to a work plays it alone: it stops at 00:00. <strong>▶ Start</strong> on a worklist plays it as a set list: each work opens on its title, and when one ends the title of the next appears.</p>
+    <h3>Starting from a point</h3>
+    <p>On the title, the coloured bar works like the progress bar of an audio player: tap or drag the head, or use − and +, to start from any point. Reset brings you back to the same point.</p>
+    <h3>Bluetooth pedal</h3>
+    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the work. On a countdown, right pauses and resumes, left resets to the title. On a title, left does nothing, so a stray press never changes the work.</p>
+    <h3>Export and import</h3>
+    <p><strong>Export</strong> at the top saves all the worklists in one file; Export inside a worklist saves that one only. <strong>Import</strong> adds the worklists of a file to those already here, without replacing them. Use it to keep a copy, to move to another phone, or to load the worklists into the web version for ensembles. Export before uninstalling the app: its worklists are lost with it.</p>
+    <hr>
     <p>Designed and built by Alessandro Ciccarelli.<br><a href="https://alessandrociccarelli.com" target="_blank" rel="noopener">alessandrociccarelli.com</a></p>
     <p class="small">© 2026. Free software under the MIT License. Works offline and collects no data.</p>
     <button class="btn" id="abClose">Close</button>
@@ -872,7 +879,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   if (window.Android) $('full').hidden = true;
 
   // About
-  $('infoBtn').addEventListener('click', () => { $('about').hidden = false; $('abClose').focus(); });
+  // the panel opens from the top: focusing Close must not scroll it to the bottom
+  $('infoBtn').addEventListener('click', () => { $('about').hidden = false; $('about').scrollTop = 0; $('abClose').focus({ preventScroll: true }); });
   $('abClose').addEventListener('click', () => { $('about').hidden = true; });
   $('about').addEventListener('click', e => { if (e.target.id === 'about') $('about').hidden = true; });
 
