@@ -64,6 +64,7 @@ button:focus-visible, input:focus-visible { outline:2px solid var(--fg); outline
 .durs { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .strip { display:flex; height:12px; border-radius:4px; overflow:hidden; gap:2px; }
 .strip span { min-width:3px; }
+.strip span.timer { min-width:10px; }
 .empty { color:var(--muted); font-size:15px; line-height:1.5; max-width:40em; }
 
 /* ---- player: the same screens as the app ---- */
@@ -93,7 +94,13 @@ body:not([data-kind="title"]):not([data-kind="next"]) #info { display:none; }
 #plDurs { font:13px var(--font-digits); opacity:.7; text-align:center; padding-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .controls { display:grid; grid-template-columns:1fr 2fr; gap:10px; padding-top:10px; flex:none; }
 body[data-kind="title"] .controls, body[data-kind="next"] .controls { grid-template-columns:1fr 2fr 1fr; }
-body:not([data-kind="title"]):not([data-kind="next"]) #nextPiece { display:none; }
+body:not([data-kind="title"]):not([data-kind="next"]):not(.timer) #nextPiece { display:none; }
+/* on a timer, Next › moves on to the next section */
+body.timer[data-kind="run"] .controls { grid-template-columns:1fr 2fr 1fr; }
+/* the ring that fills while the right pedal is held on a timer: full = next section */
+#hold { position:fixed; left:50%; top:50%; width:30vmin; height:30vmin; transform:translate(-50%, -50%) rotate(-90deg); z-index:15; pointer-events:none; }
+#hold circle { fill:none; stroke:var(--seg-ink); stroke-width:6; stroke-linecap:round; stroke-dasharray:276.5; stroke-dashoffset:276.5; opacity:.85; }
+#hold.fill circle { stroke-dashoffset:0; transition:stroke-dashoffset 2s linear; }
 .controls button { height:58px; border-radius:10px; font:600 17px var(--font-ui); letter-spacing:.1em; text-transform:uppercase; }
 #reset, #nextPiece { background:color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border:1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color:var(--seg-ink); }
 #main { background:var(--seg-fg); border:none; color:var(--seg-bg); }
@@ -173,7 +180,8 @@ label.check input { width:20px; height:20px; accent-color:var(--accent); }
     <button id="nextPiece">Next ›</button>
   </div>
 </div>
-<div class="hint" id="hint">Commands reach every display together, about one second after you press. Pedal or keyboard: on a title, → ↓ Page Down Space Enter = Start; on a countdown, the same keys = Pause / Resume, ← ↑ Page Up = Reset to the title.</div>
+<div class="hint" id="hint">Commands reach every display together, about one second after you press. Pedal or keyboard: on a title, → ↓ Page Down Space Enter = Start; on a countdown, the same keys = Pause / Resume, ← ↑ Page Up = Reset to the title; on a timer, a short press = Pause / Resume, held 2 s = next section.</div>
+<svg id="hold" hidden viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44"/></svg>
 
 <div class="dialog" id="login" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
   <form class="card" id="loginForm" autocomplete="off">

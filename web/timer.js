@@ -81,30 +81,63 @@ const Relais = (() => {
   const p2 = n => String(n).padStart(2, '0');
   const fmt = t => { const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return h ? `${h}:${p2(m)}:${p2(s)}` : `${p2(m)}:${p2(s)}`; };
   const fmtDur = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; return h ? `${h}:${p2(m)}:${p2(r)}` : `${m}:${p2(r)}`; };
-  const cums = w => { const c = [0]; w.segments.forEach(s => c.push(c[c.length - 1] + s.s * 1000)); return c; };
-  const segIndex = (c, el) => { let i = 0; while (i < c.length - 2 && el >= c[i + 1]) i++; return i; };
 
-  // ---- Seek bar: the coloured sections of a piece, a head at the start position ----
-  // Each section takes the digit colour of its countdown. Time and position are mapped on the
-  // sections themselves, not on the whole bar, so the gaps never shift the head off the colours.
+  // ---- Sections: a countdown {s, bg, fg} or a timer {t: 'timer', bg, fg}, which counts up and has no end of its own ----
+  const isTimer = g => g.t === 'timer';
+  const secLen = (w, k) => isTimer(w.segments[k]) ? 0 : w.segments[k].s * 1000;
+  const total = w => w.segments.reduce((a, g) => a + (isTimer(g) ? 0 : g.s), 0); // seconds of the countdowns
+  const hasTimer = w => w.segments.some(isTimer);
+  const durText = g => isTimer(g) ? '∞' : fmtDur(g.s);
+  const totalText = w => fmtDur(total(w)) + (hasTimer(w) ? ' + ∞' : '');
+  const timerWeight = w => Math.max(20, Math.round(total(w) * 0.12)); // width of a timer in the bars, in seconds
+
+  // ---- Start position {k: section, ms: into it}; a timer always starts from its beginning ----
+  function clampSeek(w, pos) {
+    const n = w.segments.length, k = Math.max(0, Math.min(n - 1, (pos && pos.k) | 0)), L = secLen(w, k);
+    return { k, ms: L ? Math.max(0, Math.min(L - 1000, Math.round(((pos && pos.ms) || 0) / 1000) * 1000)) : 0 };
+  }
+  const lastSeek = w => { const n = w.segments.length, L = secLen(w, n - 1); return { k: n - 1, ms: L ? L - 1000 : 0 }; };
+  function stepSeek(w, pos, d) { // one second earlier or later; across sections a timer counts as one position
+    let { k, ms } = pos;
+    if (d > 0) { if (secLen(w, k) && ms + 1000 < secLen(w, k)) ms += 1000; else if (k + 1 < w.segments.length) { k++; ms = 0; } }
+    else { if (ms >= 1000) ms -= 1000; else if (k > 0) { k--; ms = secLen(w, k) ? secLen(w, k) - 1000 : 0; } }
+    return { k, ms };
+  }
+  // the absolute time is given only when no timer comes before: after a timer it is not known
+  function seekText(w, pos) {
+    const n = w.segments.length, { k, ms } = pos, g = w.segments[k];
+    if (k === 0 && ms === 0) return 'From the beginning';
+    const before = w.segments.slice(0, k), what = isTimer(g) ? 'timer' : `${fmt(Math.ceil((secLen(w, k) - ms) / 1000))} left`;
+    return before.some(isTimer) ? `From ${k + 1}/${n} · ${what}` : `From ${fmtDur((before.reduce((a, x) => a + x.s, 0) * 1000 + ms) / 1000)} · ${k + 1}/${n} · ${what}`;
+  }
+
+  // ---- Coloured bars: one section per countdown, proportional to its length, in the digit colour;
+  // a timer is striped. Time and position are mapped on the sections themselves, not on the whole
+  // bar, so the gaps never shift the head off the colours. ----
   function strip(box, w) {
     box.textContent = '';
-    w.segments.forEach(s => { const sp = document.createElement('span'); sp.style.flex = `${s.s} 1 0`; sp.style.background = s.fg; box.append(sp); });
+    const tw = timerWeight(w);
+    w.segments.forEach(g => {
+      const sp = document.createElement('span');
+      sp.style.flex = `${isTimer(g) ? tw : g.s} 1 0`;
+      sp.style.background = isTimer(g) ? `repeating-linear-gradient(135deg, ${g.fg} 0 3px, rgba(0,0,0,.45) 3px 7px)` : g.fg;
+      if (isTimer(g)) sp.className = 'timer';
+      box.append(sp);
+    });
   }
-  function placeHead(bar, stripBox, head, past, w, seek) {
-    const spans = stripBox.children, c = cums(w);
-    if (!spans.length) return;
-    const i = Math.min(segIndex(c, seek), spans.length - 1);
-    const b = bar.getBoundingClientRect(), r = spans[i].getBoundingClientRect();
-    const x = r.left - b.left + (seek - c[i]) / (c[i + 1] - c[i]) * r.width;
-    head.style.left = x + 'px'; if (past) past.style.width = (seek ? x : 0) + 'px';
+  function placeHead(bar, stripBox, head, past, w, pos) {
+    const sp = stripBox.children[pos.k];
+    if (!sp) return;
+    const b = bar.getBoundingClientRect(), r = sp.getBoundingClientRect(), L = secLen(w, pos.k);
+    const x = r.left - b.left + (L ? pos.ms / L : 0) * r.width;
+    head.style.left = x + 'px'; if (past) past.style.width = (pos.k || pos.ms ? x : 0) + 'px';
   }
   function seekFromX(stripBox, w, clientX) {
-    const spans = [...stripBox.children], c = cums(w);
-    const i = spans.findIndex(sp => clientX < sp.getBoundingClientRect().right);
-    if (i < 0) return c[c.length - 1];
-    const r = spans[i].getBoundingClientRect();
-    return c[i] + Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * (c[i + 1] - c[i]);
+    const spans = [...stripBox.children];
+    const k = spans.findIndex(sp => clientX < sp.getBoundingClientRect().right);
+    if (k < 0) return lastSeek(w);
+    const r = spans[k].getBoundingClientRect();
+    return clampSeek(w, { k, ms: Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * secLen(w, k) });
   }
 
   // ---- Clock: offset from the server, from the sample with the shortest round trip ----
@@ -119,31 +152,47 @@ const Relais = (() => {
   const now = () => Date.now() + skew; // server time
 
   // ---- State → what to show at server time t ----
-  // elapsed in the piece = seek + acc + time run since `since`, stopped at `until` if paused.
-  // Kinds: idle, title (of the loaded piece), run, next (title of the next piece, the current one
-  // being over), done (single piece over: 00:00), end (setlist over).
-  // Blinking in time, as in the app: for the first three seconds of a new countdown the digits are
-  // lit in the first 550 ms of every second. The countdown the run starts from never blinks.
+  // A run is a chain of sections that follow one another by themselves: it starts at section `base`,
+  // `off` ms into it, and goes on through the countdowns until it meets a timer, where it stays until
+  // the conductor moves on (a new chain at the next section). Time run in the chain = acc + time
+  // since `since`, stopped at `until` if paused.
+  // Kinds: idle, title (of the loaded piece), run (a countdown or a timer), next (title of the next
+  // piece, the current one being over), done (single piece over: 00:00), end (setlist over).
+  // Blinking in time, as in the app: for the first three seconds of a new section the digits are lit
+  // in the first 550 ms of every second. The section a run starts from with Start never blinks.
   const BLINK_BEATS = 3, BLINK_ON = 550;
   const blinkLit = since => !(since >= 0 && since < BLINK_BEATS * 1000 && since % 1000 >= BLINK_ON);
+  function chainAt(w, base, off, el) {
+    const n = w.segments.length;
+    let k = base, ms = el + off;
+    while (k < n) {
+      if (isTimer(w.segments[k])) return { k, ms };
+      const L = secLen(w, k);
+      if (ms < L) return { k, ms };
+      ms -= L; k++;
+    }
+    return { k: n, over: true, ms };
+  }
   function view(s, t = now()) {
     if (!s || s.mode === 'idle' || !s.piece) return { kind: 'idle' };
-    const w = s.piece, c = cums(w), n = w.segments.length, tot = c[n];
-    if (s.mode === 'title') { const i = segIndex(c, s.seek); return { kind: 'title', piece: w, seek: s.seek, i, n, bg: w.segments[i].bg, fg: w.segments[i].fg }; }
+    const w = s.piece, n = w.segments.length;
+    if (s.mode === 'title') { const g = w.segments[s.seek.k]; return { kind: 'title', piece: w, seek: s.seek, n, bg: g.bg, fg: g.fg }; }
     const waiting = s.since !== null && t < s.since && s.acc === 0;
     const run = s.since === null ? 0 : Math.max(0, Math.min(t, s.until ?? Infinity) - s.since);
-    const el = s.seek + s.acc + run;
     const paused = s.until !== null && t >= s.until;
-    if (el < tot) {
-      const i = segIndex(c, el), start = segIndex(c, s.seek), g = w.segments[i];
-      return { kind: 'run', piece: w, i, n, el, paused, waiting, text: fmt(Math.ceil((c[i + 1] - el) / 1000)),
-               bg: g.bg, fg: g.fg, lit: i > start ? blinkLit(el - c[i]) : true };
+    const c = chainAt(w, s.base, s.off, s.acc + run);
+    if (!c.over) {
+      const g = w.segments[c.k], timer = isTimer(g);
+      return { kind: 'run', piece: w, i: c.k, n, timer, paused, waiting, bg: g.bg, fg: g.fg,
+               text: timer ? fmt(Math.floor(c.ms / 1000)) : fmt(Math.ceil((secLen(w, c.k) - c.ms) / 1000)),
+               lit: (c.k > s.base || s.fresh) ? blinkLit(c.ms - (c.k === s.base ? s.off : 0)) : true };
     }
-    if (s.list && s.next) { const g = s.next.segments[0]; return { kind: 'next', piece: s.next, seek: 0, i: 0, n: s.next.segments.length, bg: g.bg, fg: g.fg, endedAt: t - (el - tot) }; }
+    if (s.list && s.next) { const g = s.next.segments[0]; return { kind: 'next', piece: s.next, seek: { k: 0, ms: 0 }, n: s.next.segments.length, bg: g.bg, fg: g.fg }; }
     if (s.list) return { kind: 'end', bg: '#0d0f10', fg: '#f2a541' };
     const g = w.segments[n - 1];
-    return { kind: 'done', piece: w, i: n - 1, n, text: fmt(0), bg: g.bg, fg: g.fg, lit: blinkLit(el - tot) };
+    return { kind: 'done', piece: w, i: n - 1, n, text: fmt(0), bg: g.bg, fg: g.fg, lit: blinkLit(c.ms) };
   }
 
-  return { draw, fitTitle, ink, fmt, fmtDur, cums, segIndex, strip, placeHead, seekFromX, sample, now, view };
+  return { draw, fitTitle, ink, fmt, fmtDur, isTimer, total, hasTimer, durText, totalText, clampSeek, stepSeek, seekText,
+           strip, placeHead, seekFromX, sample, now, view };
 })();

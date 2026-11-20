@@ -66,12 +66,32 @@ function piece_in($w) {
   foreach (array_slice($w['segments'], 0, MAX_SEGS) as $g) {
     if (!is_array($g)) continue;
     $bg = color_or_null($g['bg'] ?? null); $fg = color_or_null($g['fg'] ?? null);
-    if ($bg === null || $fg === null || !is_numeric($g['s'] ?? null)) continue;
+    if ($bg === null || $fg === null) continue;
+    // a timer has no length: it counts up until the conductor moves on
+    if (($g['t'] ?? null) === 'timer') { $segs[] = ['t' => 'timer', 'bg' => $bg, 'fg' => $fg]; continue; }
+    if (!is_numeric($g['s'] ?? null)) continue;
     $segs[] = ['s' => int_in($g['s'], 1, MAX_SEG_S), 'bg' => $bg, 'fg' => $fg];
   }
   return $segs ? ['name' => name_in($w['name'] ?? ''), 'segments' => $segs] : null;
 }
-function piece_ms($w) { $t = 0; foreach ($w['segments'] as $g) $t += $g['s']; return $t * 1000; }
+// the section the current chain is in at instant $t (ms), as the displays compute it; count = the piece is over
+function chain_k($S, $t) {
+  $segs = $S['piece']['segments']; $n = count($segs);
+  $ms = $S['acc'] + ($S['since'] === null ? 0 : max(0, min($t, $S['until'] ?? PHP_INT_MAX) - $S['since'])) + $S['off'];
+  for ($k = $S['base']; $k < $n; $k++) {
+    if (isset($segs[$k]['t'])) return $k;
+    if ($ms < $segs[$k]['s'] * 1000) return $k;
+    $ms -= $segs[$k]['s'] * 1000;
+  }
+  return $n;
+}
+// a start position {k: section, ms: into it, in whole seconds}; a timer always starts from its beginning
+function seek_in($w, $pos) {
+  $n = count($w['segments']); $pos = is_array($pos) ? $pos : [];
+  $k = int_in($pos['k'] ?? 0, 0, $n - 1); $g = $w['segments'][$k];
+  if (isset($g['t'])) return ['k' => $k, 'ms' => 0];
+  return ['k' => $k, 'ms' => int_in(round(((float)($pos['ms'] ?? 0)) / 1000) * 1000, 0, $g['s'] * 1000 - 1000)];
+}
 // the same computer as the server, and not through a proxy (which would make every visitor look local)
 function is_local() {
   foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_FORWARDED', 'HTTP_X_REAL_IP', 'HTTP_CF_CONNECTING_IP'] as $h) if (!empty($_SERVER[$h])) return false;
@@ -150,7 +170,10 @@ $DEFAULTS = [
   'setlist' => '',           // name of the setlist
   'pos' => 0,           // position of the piece in the setlist, from 0
   'count' => 1,         // pieces in the setlist
-  'seek' => 0,          // start position in the piece, ms (seek bar of the title)
+  'seek' => null,       // start position {k: section, ms: into it} (seek bar of the title)
+  'base' => 0,          // section the current chain started from: the chain runs through the countdowns
+  'off' => 0,           //   from there, `off` ms into it, and stops at a timer until the conductor moves on
+  'fresh' => false,     // the chain started by moving on from a timer: its first section blinks
   'acc' => 0,           // ms elapsed in the runs that are over
   'since' => null,      // server instant at which the current run starts (null: stopped)
   'until' => null,      // server instant at which the current run is paused (null: running)
@@ -168,7 +191,11 @@ $S['list'] = (bool)$S['list'];
 $S['setlist'] = name_in($S['setlist']);
 $S['count'] = int_in($S['count'], 1, 999);
 $S['pos'] = int_in($S['pos'], 0, $S['count'] - 1);
-$S['seek'] = $S['piece'] ? int_in($S['seek'], 0, piece_ms($S['piece']) - 1000) : 0;
+$S['seek'] = $S['piece'] ? seek_in($S['piece'], $S['seek']) : ['k' => 0, 'ms' => 0];
+$S['base'] = $S['piece'] ? int_in($S['base'], 0, count($S['piece']['segments'])) : 0; // = count: the piece is over
+$S['off'] = $S['piece'] && $S['base'] < count($S['piece']['segments']) && !isset($S['piece']['segments'][$S['base']]['t'])
+  ? int_in($S['off'], 0, $S['piece']['segments'][$S['base']]['s'] * 1000) : 0;
+$S['fresh'] = (bool)$S['fresh'];
 $S['acc'] = max(0, (int)$S['acc']);
 $S['since'] = $S['mode'] === 'run' && is_numeric($S['since']) ? (int)$S['since'] : null;
 $S['until'] = $S['since'] !== null && is_numeric($S['until']) ? (int)$S['until'] : null;
@@ -189,7 +216,7 @@ $delay = max(0, min(5000, (int)SYNC_DELAY_MS));
 // what every page needs to draw the timer
 function timer($S) {
   $t = ['rev' => $S['rev'], 'now' => now_ms()];
-  foreach (['mode', 'piece', 'next', 'list', 'setlist', 'pos', 'count', 'seek', 'acc', 'since', 'until', 'vibrate'] as $k) $t[$k] = $S[$k];
+  foreach (['mode', 'piece', 'next', 'list', 'setlist', 'pos', 'count', 'seek', 'base', 'off', 'fresh', 'acc', 'since', 'until', 'vibrate'] as $k) $t[$k] = $S[$k];
   return $t;
 }
 function online($S) {
@@ -275,7 +302,7 @@ switch ($a) {
     $running = $S['mode'] === 'run' && $S['since'] !== null && $S['until'] === null;
     switch ($a) {
       case 'state': break;
-      case 'logout': { // closes the timer too, unless another conductor is at piece right now
+      case 'logout': { // closes the timer too, unless another conductor is at work right now
         unset($A['tokens'][token_hash($token)]); auth_save($A);
         unset($S['conductors'][substr(token_hash($token), 0, 16)]);
         $others = false;
@@ -290,21 +317,31 @@ switch ($a) {
         $S['piece'] = $w; $S['next'] = !empty($in['list']) ? piece_in($in['next'] ?? null) : null;
         $S['list'] = !empty($in['list']); $S['setlist'] = name_in($in['setlist'] ?? '');
         $S['count'] = int_in($in['count'] ?? 1, 1, 999); $S['pos'] = int_in($in['pos'] ?? 0, 0, $S['count'] - 1);
-        $S['seek'] = int_in(round(((float)($in['seek'] ?? 0)) / 1000) * 1000, 0, piece_ms($w) - 1000);
+        $S['seek'] = seek_in($w, $in['seek'] ?? null);
         $S['acc'] = 0; $S['since'] = null; $S['until'] = null; $S['mode'] = 'title';
-        if (!empty($in['start'])) { $S['mode'] = 'run'; $S['since'] = $at; }
+        if (!empty($in['start'])) { $S['mode'] = 'run'; $S['base'] = $S['seek']['k']; $S['off'] = $S['seek']['ms']; $S['fresh'] = false; $S['since'] = $at; }
         $S['rev']++; $dirty = true;
         break;
       }
       case 'seek': // start position, on the title only
         if ($S['mode'] === 'title') {
-          $S['seek'] = int_in(round(((float)($in['ms'] ?? 0)) / 1000) * 1000, 0, piece_ms($S['piece']) - 1000);
+          $S['seek'] = seek_in($S['piece'], $in);
           $S['rev']++; $dirty = true;
         }
         break;
-      case 'start': // from the title, at the start position
+      case 'start': // from the title, at the start position: a chain from that section
         if ($S['mode'] === 'title') {
-          $S['mode'] = 'run'; $S['acc'] = 0; $S['since'] = $at; $S['until'] = null; $S['rev']++; $dirty = true;
+          $S['mode'] = 'run'; $S['base'] = $S['seek']['k']; $S['off'] = $S['seek']['ms']; $S['fresh'] = false;
+          $S['acc'] = 0; $S['since'] = $at; $S['until'] = null; $S['rev']++; $dirty = true;
+        }
+        break;
+      case 'advance': // moving on from the timer at section k: a new chain at the next section (resumes if paused)
+        $k = int_in($in['k'] ?? -1, -1, MAX_SEGS);
+        // accepted only if the chain is on that timer now: a late or repeated command does nothing
+        if ($S['mode'] === 'run' && $S['since'] !== null && $k >= 0 && $k < count($S['piece']['segments'])
+            && isset($S['piece']['segments'][$k]['t']) && chain_k($S, now_ms()) === $k) {
+          $S['base'] = $k + 1; $S['off'] = 0; $S['fresh'] = true; // base = number of sections: the piece is over
+          $S['acc'] = 0; $S['since'] = $at; $S['until'] = null; $S['rev']++; $dirty = true;
         }
         break;
       case 'pause':
@@ -322,7 +359,7 @@ switch ($a) {
         }
         break;
       case 'clear': // no piece: the displays wait for the conductor
-        $S['mode'] = 'idle'; $S['piece'] = null; $S['next'] = null; $S['seek'] = 0;
+        $S['mode'] = 'idle'; $S['piece'] = null; $S['next'] = null; $S['seek'] = ['k' => 0, 'ms' => 0];
         $S['acc'] = 0; $S['since'] = null; $S['until'] = null; $S['rev']++; $dirty = true;
         break;
       case 'look': // vibration at each change, at any moment

@@ -86,6 +86,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 .piecebody .durs { font: 13px var(--font-digits); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; }
 .strip span { min-width: 3px; border-bottom: 3px solid; }
+.strip span.timer { min-width: 10px; }
+/* the ring that fills while the right pedal is held on a timer: full = next section */
+#hold { position: fixed; left: 50%; top: 50%; width: 38vmin; height: 38vmin; transform: translate(-50%, -50%) rotate(-90deg); z-index: 15; pointer-events: none; }
+#hold circle { fill: none; stroke: var(--seg-ink); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: 276.5; opacity: .85; }
+#hold.fill circle { stroke-dashoffset: 0; transition: stroke-dashoffset 2s linear; }
 .slfoot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
 .slfoot div { display: flex; gap: 8px; }
 .empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
@@ -105,6 +110,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   color: inherit; text-align: center; font: 400 24px var(--font-digits); padding: 2px 0;
 }
 .dur b { font: 400 24px var(--font-digits); }
+.tnote { font-size: 13px; opacity: .8; }
 .segcol { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pick { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); overflow: hidden; flex: none; }
 .pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
@@ -112,6 +118,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 .pairs { display: flex; gap: 6px; flex-wrap: wrap; }
 .pair { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); padding: 0; }
 .addseg { margin-top: 12px; width: 100%; height: 48px; }
+.addseg + .addseg { margin-top: 8px; }
 .radio { display: flex; gap: 8px; }
 .radio button { flex: 1; }
 .radio button[aria-checked="true"] { border-color: var(--accent); color: var(--accent); }
@@ -155,10 +162,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 #player[data-mode="end"] .scrub, #player[data-mode="end"] .seekrow { display: none; }
 .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding-top: 10px; flex: none; }
 #player[data-mode="title"] .controls { grid-template-columns: 1fr 2fr 1fr; }
-#player:not([data-mode="title"]) #nextPiece { display: none; }
+#player:not([data-mode="title"]):not(.timer) #nextPiece { display: none; }
+/* on a timer, Next › moves on to the next section */
+#player.timer[data-mode="run"] .controls { grid-template-columns: 1fr 2fr 1fr; }
 /* a single piece: no previous or next on its title, Start only */
 #player[data-list="0"][data-mode="title"] .controls { grid-template-columns: 1fr; }
-#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"] #nextPiece { display: none; }
+#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"][data-mode="title"] #nextPiece { display: none; }
 #nextPiece { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
 .controls button:disabled { opacity: .35; cursor: default; }
 .controls button { height: 58px; border-radius: 10px; font: 600 17px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
@@ -226,9 +235,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
       <label for="edName">Piece</label>
       <input class="name" id="edName" maxlength="60" style="font-size:22px">
     </div>
-    <div class="lbl" style="margin-bottom:8px">Countdowns <span id="edTotal" style="font-family:var(--font-digits);letter-spacing:0;text-transform:none"></span></div>
+    <div class="lbl" style="margin-bottom:8px">Sections <span id="edTotal" style="font-family:var(--font-digits);letter-spacing:0;text-transform:none"></span></div>
     <div class="segs" id="segs"></div>
     <button class="btn addseg" id="addSeg">+ Add countdown</button>
+    <button class="btn addseg" id="addTimer">+ Add timer</button>
   </div>
   <div class="edfoot">
     <button class="btn danger" id="edDelete">Delete</button>
@@ -277,19 +287,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     <button id="nextPiece">Next ›</button>
   </div>
   <div class="hint" id="hint" hidden>Tap for controls</div>
+  <svg id="hold" hidden viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44"/></svg>
 </section>
 
 <div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
   <div class="card">
     <h2 id="abTitle">Relais</h2>
-    <div class="ver">Version 0.5.0</div>
+    <div class="ver">Version 0.6.0</div>
     <p>Sequential countdowns: each one starts by itself when the previous one ends, with its own colours.</p>
     <h3>Pieces and setlists</h3>
     <p>Tap a piece to edit its countdowns. ▶ next to a piece plays it alone: it stops at 00:00. <strong>▶ Start</strong> on a setlist plays it in order: each piece opens on its title, and when one ends the title of the next appears.</p>
+    <h3>Timers</h3>
+    <p><strong>+ Add timer</strong> adds a section of open length: it counts up from 0:00 until you move on. Hold the right pedal for 2 seconds, or tap <strong>Next ›</strong>, to go to the next section; a short press pauses and resumes.</p>
     <h3>Starting from a point</h3>
     <p>On the title, the coloured bar works like the progress bar of an audio player: tap or drag the head, or use − and +, to start from any point. Reset brings you back to the same point.</p>
     <h3>Bluetooth pedal</h3>
-    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the piece. On a countdown, right pauses and resumes, left resets to the title. On a title, left does nothing, so a stray press never changes the piece.</p>
+    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the piece. On a countdown, right pauses and resumes, left resets to the title. On a timer, a short press of right pauses and resumes, holding it for 2 seconds moves on. On a title, left does nothing, so a stray press never changes the piece.</p>
     <h3>Export and import</h3>
     <p><strong>Export</strong> at the top saves all the setlists in one file; Export inside a setlist saves that one only. <strong>Import</strong> adds the setlists of a file to those already here, without replacing them. Use it to keep a copy, to move to another phone, or to load the setlists into the web version for ensembles. Export before uninstalling the app: its setlists are lost with it.</p>
     <hr>
@@ -306,7 +319,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   const body = document.body;
 
   // ================= Data =================
-  // library = { setlists: [ { id, name, pieces: [ { id, name, segments: [ {s, bg, fg} ] } ] } ] }
+  // library = { setlists: [ { id, name, pieces: [ { id, name, segments: [ section… ] } ] } ] }
+  // A section is a countdown {s, bg, fg} or a timer {t: 'timer', bg, fg}: a timer counts up from 0:00
+  // and has no end of its own; the performer moves on to the next section (right pedal held 2 s).
   // In the player a setlist is played in order: at the end of a piece the title of the next one appears.
   // (Until 0.4.1 setlists and pieces were called worklists and works.)
   // s = length in seconds; bg, fg = background and digit colours (#rrggbb).
@@ -336,8 +351,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     secs: v => Math.max(1, Math.min(MAX_S, Math.round(+v) || 1)),
     piece(w, i) {
       if (!w || typeof w !== 'object') return null;
-      const segs = (Array.isArray(w.segments) ? w.segments : []).slice(0, MAX_SEGS).map((s, k) => s && typeof s === 'object'
-        ? { s: clean.secs(s.s), bg: clean.color(s.bg, PAIRS[k % PAIRS.length][0]), fg: clean.color(s.fg, PAIRS[k % PAIRS.length][1]) } : null).filter(Boolean);
+      const segs = (Array.isArray(w.segments) ? w.segments : []).slice(0, MAX_SEGS).map((s, k) => {
+        if (!s || typeof s !== 'object') return null;
+        const bg = clean.color(s.bg, PAIRS[k % PAIRS.length][0]), fg = clean.color(s.fg, PAIRS[k % PAIRS.length][1]);
+        return s.t === 'timer' ? { t: 'timer', bg, fg } : { s: clean.secs(s.s), bg, fg };
+      }).filter(Boolean);
       if (!segs.length) segs.push(seg(60, 0));
       return { id: uid(), name: clean.name(w.name, `Piece ${i + 1}`), segments: segs };
     },
@@ -359,7 +377,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 
   const fmtDur = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60, p = n => String(n).padStart(2, '0');
                         return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`; };
-  const total = w => w.segments.reduce((a, s) => a + s.s, 0);
+  // sections: countdowns have a length, timers have none
+  const isTimer = s => s.t === 'timer';
+  const total = w => w.segments.reduce((a, s) => a + (isTimer(s) ? 0 : s.s), 0); // seconds of the countdowns
+  const hasTimer = w => w.segments.some(isTimer);
+  const durText = s => isTimer(s) ? '∞' : fmtDur(s.s);
+  const totalText = w => fmtDur(total(w)) + (hasTimer(w) ? ' + ∞' : '');
+  // width of a timer in the coloured bars, as if it lasted this many seconds
+  const timerWeight = w => Math.max(20, Math.round(total(w) * 0.12));
   const findPiece = id => { for (const l of lib.setlists) { const i = l.pieces.findIndex(w => w.id === id); if (i >= 0) return { l, i, w: l.pieces[i] }; } return null; };
   const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; };
 
@@ -370,9 +395,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     kids.flat().forEach(c => e.append(c));
     return e;
   }
-  function strip(box, w) {
+  // the coloured bar of a piece: one section per countdown, proportional to its length; a timer is
+  // striped, since it has no length of its own. bar = true: the seek bar of the title, in digit colours.
+  function strip(box, w, bar) {
     box.textContent = '';
-    w.segments.forEach(s => box.append(h('span', { style: { flex: s.s + ' 1 0', background: s.bg, borderBottomColor: s.fg } })));
+    const tw = timerWeight(w);
+    w.segments.forEach(s => {
+      const flex = (isTimer(s) ? tw : s.s) + ' 1 0';
+      const bgc = bar ? s.fg : s.bg;
+      const background = isTimer(s) ? `repeating-linear-gradient(135deg, ${s.fg} 0 3px, ${bar ? 'rgba(0,0,0,.45)' : s.bg} 3px 7px)` : bgc;
+      box.append(h('span', { className: isTimer(s) ? 'timer' : '', style: bar ? { flex, background, borderBottomWidth: '0' } : { flex, background, borderBottomColor: s.fg } }));
+    });
   }
   // a delete button that asks for a second tap within three seconds
   function twoTap(btn, label, act) {
@@ -407,9 +440,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
       l.pieces.forEach((w, wi) => {
         const st = h('div', { className: 'strip' }); strip(st, w);
         const card = h('button', { className: 'piecebody', ariaLabel: `Edit ${w.name}`, onclick: () => openEditor(w.id) },
-          h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: fmtDur(total(w)) })),
+          h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: totalText(w) })),
           st,
-          h('div', { className: 'durs', textContent: w.segments.map(s => fmtDur(s.s)).join(' · ') }));
+          h('div', { className: 'durs', textContent: w.segments.map(durText).join(' · ') }));
         pieces.append(h('div', { className: 'piece' }, card,
           h('button', { className: 'mini', textContent: '▲', disabled: wi === 0, ariaLabel: 'Move piece up', onclick: () => { move(l.pieces, wi, -1); save(); renderLibrary(); } }),
           h('button', { className: 'mini', textContent: '▼', disabled: wi === l.pieces.length - 1, ariaLabel: 'Move piece down', onclick: () => { move(l.pieces, wi, 1); save(); renderLibrary(); } }),
@@ -482,7 +515,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     const w = f.w;
     $('edName').value = w.name;
     $('edWhere').textContent = f.l.name;
-    $('edTotal').textContent = '· ' + fmtDur(total(w));
+    $('edTotal').textContent = '· ' + totalText(w);
     const box = $('segs'); box.textContent = '';
     w.segments.forEach((s, i) => {
       const row = h('div', { className: 'seg', style: { background: s.bg, color: s.fg } });
@@ -491,7 +524,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
       const upd = () => {
         mi.value = mi.value.replace(/\D/g, ''); se.value = se.value.replace(/\D/g, '');
         s.s = clean.secs(Math.min(999, +mi.value || 0) * 60 + Math.min(59, +se.value || 0)); save();
-        $('edTotal').textContent = '· ' + fmtDur(total(w));
+        $('edTotal').textContent = '· ' + totalText(w);
       };
       mi.addEventListener('input', upd); se.addEventListener('input', upd);
       se.addEventListener('blur', () => { se.value = String(s.s % 60).padStart(2, '0'); mi.value = Math.floor(s.s / 60); });
@@ -502,7 +535,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
       row.append(
         h('div', { className: 'segtop' },
           h('span', { className: 'segnum', textContent: String(i + 1).padStart(2, '0') }),
-          h('div', { className: 'dur' }, mi, h('b', { textContent: ':' }), se),
+          isTimer(s) ? h('div', { className: 'dur' }, h('b', { textContent: '∞' }), h('span', { className: 'tnote', textContent: 'Timer: counts up until you move on' }))
+                     : h('div', { className: 'dur' }, mi, h('b', { textContent: ':' }), se),
           h('button', { className: 'mini', textContent: '▲', disabled: i === 0, ariaLabel: 'Move up', style: { color: s.fg }, onclick: () => { move(w.segments, i, -1); save(); renderEditor(); } }),
           h('button', { className: 'mini', textContent: '▼', disabled: i === w.segments.length - 1, ariaLabel: 'Move down', style: { color: s.fg }, onclick: () => { move(w.segments, i, 1); save(); renderEditor(); } }),
           h('button', { className: 'mini', textContent: '⧉', ariaLabel: 'Duplicate', disabled: w.segments.length >= MAX_SEGS, style: { color: s.fg }, onclick: () => { w.segments.splice(i + 1, 0, { ...s }); save(); renderEditor(); } }),
@@ -513,11 +547,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
           pairs));
       box.append(row);
     });
-    $('addSeg').disabled = w.segments.length >= MAX_SEGS;
+    $('addSeg').disabled = $('addTimer').disabled = w.segments.length >= MAX_SEGS;
   }
   $('edName').addEventListener('input', () => { const f = findPiece(edId); if (f) { f.w.name = $('edName').value; save(); } });
-  $('addSeg').addEventListener('click', () => { const f = findPiece(edId); if (!f) return; f.w.segments.push(seg(60, f.w.segments.length)); save(); renderEditor();
-    const sc = $('editor').querySelector('.scroll'); sc.scrollTop = sc.scrollHeight; });
+  function addSection(timer) {
+    const f = findPiece(edId); if (!f) return;
+    const s = seg(60, f.w.segments.length);
+    f.w.segments.push(timer ? { t: 'timer', bg: s.bg, fg: s.fg } : s); save(); renderEditor();
+    const sc = $('editor').querySelector('.scroll'); sc.scrollTop = sc.scrollHeight;
+  }
+  $('addSeg').addEventListener('click', () => addSection(false));
+  $('addTimer').addEventListener('click', () => addSection(true));
   $('edBack').addEventListener('click', () => go('library'));
   $('edPlay').addEventListener('click', () => openPlayer(edId, false));
   $('edDup').addEventListener('click', () => {
@@ -605,27 +645,29 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
                      return hh ? `${hh}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`; };
 
   // Two ways to play, both opening on the title of a piece, static until the pedal starts it.
-  // A setlist (its own Start) is played in order: when the last countdown of a piece ends, the
+  // A setlist (its own Start) is played in order: when the last section of a piece ends, the
   // title of the next piece appears, and after the last piece a closing screen.
-  // A single piece (its own Start) stops at 00:00 when its last countdown ends.
-  // Modes: 'title' (name of the piece), 'run' (countdowns), 'done' (single piece over, 00:00),
+  // A single piece (its own Start) stops at 00:00 when its last section ends.
+  // Modes: 'title' (name of the piece), 'run' (sections), 'done' (single piece over, 00:00),
   // 'end' (end of the setlist).
+  //
+  // Time model. A run is a chain of sections that follow one another by themselves: it starts at
+  // section P.base, P.off ms into it, at instant P.startAt (moved forward by every pause), and goes on
+  // through the countdowns until it meets a timer, where it stays. Moving on from a timer starts a new
+  // chain at the next section. Everything on screen is computed from the clock and these three values.
+  // The start position chosen on the title is P.seek = {k: section, ms: into it; 0 for a timer}.
   function openPlayer(id, asList) {
     const f = findPiece(id); if (!f) return;
     P = { l: f.l, list: !!asList, seq: asList ? f.l.pieces : [f.w], i: asList ? f.i : 0,
-          mode: 'title', startAt: 0, pausedAt: null, idx: 0, blinkAt: -1e9 };
+          mode: 'title', base: 0, off: 0, startAt: 0, pausedAt: null, fresh: false, idx: 0, doneAt: 0 };
     pl.dataset.list = asList ? '1' : '0';
     go('player'); keepAwake(); toTitle(P.i, false);
   }
-  function load(i) {
-    const w = P.seq[i];
-    P.i = i; P.w = JSON.parse(JSON.stringify(w));
-    P.cum = [0]; P.w.segments.forEach(s => P.cum.push(P.cum[P.cum.length - 1] + s.s * 1000));
-  }
+  function load(i) { P.i = i; P.w = JSON.parse(JSON.stringify(P.seq[i])); }
   function setMode(m) { P.mode = m; pl.dataset.mode = m; }
   function stopClock() {
-    cancelAnimationFrame(raf); clearTimeout(hideTimer);
-    P.pausedAt = null; P.idx = 0; P.blinkAt = -1e9; pl.classList.remove('paused');
+    cancelAnimationFrame(raf); clearTimeout(hideTimer); holdCancel();
+    P.pausedAt = null; P.idx = 0; pl.classList.remove('paused', 'timer');
   }
   function colors(bg, fg) {
     const ps = pl.style;
@@ -650,21 +692,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     if (blink) { void el.offsetWidth; el.classList.add('blink'); }
   }
   // keepSeek: Reset brings back the title with the start position chosen before (to rehearse from
-  // the same point); a different piece, or the next one in a setlist, starts from 0:00.
+  // the same point); a different piece, or the next one in a setlist, starts from the beginning.
   function toTitle(i, blink, keepSeek) {
     stopClock(); load(i); setMode('title');
-    if (!keepSeek) P.seek = 0;
+    if (!keepSeek) P.seek = { k: 0, ms: 0 };
     const n = P.seq.length;
     setTitle(P.w.name, blink);
-    strip($('plStrip'), P.w);
-    // in the seek bar each section takes the digit colour: on a title painted in the background
-    // colour of a countdown, that same background would vanish
-    [...$('plStrip').children].forEach((sp, k) => { sp.style.background = P.w.segments[k].fg; sp.style.borderBottomWidth = '0'; });
-    setSeek(P.seek || 0);
-    $('plDurs').textContent = P.w.segments.map(s => fmtDur(s.s)).join(' · ') + ' = ' + fmtDur(total(P.w));
+    strip($('plStrip'), P.w, true);
+    setSeek(P.seek);
+    $('plDurs').textContent = P.w.segments.map(durText).join(' · ') + ' = ' + totalText(P.w);
     label.textContent = P.list ? `${i + 1}/${n} · ${P.l.name}` : 'Ready';
     $('reset').textContent = '‹ Prev'; $('reset').disabled = i === 0;
-    $('nextPiece').disabled = i === n - 1;
+    $('nextPiece').textContent = 'Next ›'; $('nextPiece').disabled = i === n - 1;
     mainB.textContent = 'Start'; mainB.disabled = false;
     immerse();
   }
@@ -674,49 +713,64 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     setTitle('End', true);
     const n = P.seq.length;
     $('plStrip').textContent = '';
-    $('plDurs').textContent = `${n} piece${n > 1 ? 's' : ''} · ${fmtDur(P.seq.reduce((a, w) => a + total(w), 0))}`;
+    $('plDurs').textContent = `${n} piece${n > 1 ? 's' : ''} · ${fmtDur(P.seq.reduce((a, w) => a + total(w), 0))}${P.seq.some(hasTimer) ? ' + ∞' : ''}`;
     label.textContent = `End · ${P.l.name}`;
     $('reset').textContent = '‹ Back'; $('reset').disabled = false;
     mainB.textContent = 'End'; mainB.disabled = true;
     immerse();
   }
   const now = () => P.pausedAt ?? Date.now();
-  // what to show after `el` ms: index of the countdown (n = the piece is over), text, colours
-  function at(el) {
-    const c = P.cum, segs = P.w.segments, n = segs.length;
-    if (el >= c[n]) return { i: n };
-    let i = 0; while (el >= c[i + 1]) i++;
-    return { i, text: fmt(Math.ceil((c[i + 1] - el) / 1000)), bg: segs[i].bg, fg: segs[i].fg };
+  // where the chain is after `el` ms: section k, ms into it; or over (all sections done), with the
+  // ms elapsed since the end. A timer stops the chain: it lasts until the performer moves on.
+  function chainAt(el) {
+    const segs = P.w.segments, n = segs.length;
+    let k = P.base, ms = el + P.off;
+    while (k < n) {
+      if (isTimer(segs[k])) return { k, ms };
+      const len = segs[k].s * 1000;
+      if (ms < len) return { k, ms };
+      ms -= len; k++;
+    }
+    return { k: n, over: true, ms };
+  }
+  // the moment the piece is over: next title in a setlist, 00:00 for a single piece
+  function finish(overMs) {
+    signal();
+    if (P.list) { if (P.i + 1 < P.seq.length) toTitle(P.i + 1, true); else toEnd(); return; }
+    // a single piece stops at 00:00, blinking in time like any change
+    setMode('done'); P.doneAt = now() - overMs; pl.classList.remove('timer');
+    mainB.textContent = 'End'; mainB.disabled = true; immerse(); loop();
   }
   function render() {
-    const t = now(), n = P.w.segments.length;
-    let st;
+    const t = now(), segs = P.w.segments, n = segs.length;
+    let text, g, lit;
     if (P.mode === 'run') {
-      st = at(t - P.startAt);
-      if (st.i >= n) { // last countdown over
-        signal();
-        if (P.list) { if (P.i + 1 < P.seq.length) toTitle(P.i + 1, true); else toEnd(); return; }
-        // a single piece stops at 00:00, blinking in time like any change
-        setMode('done'); P.blinkAt = P.startAt + P.cum[n];
-        mainB.textContent = 'End'; mainB.disabled = true; immerse();
-      } else if (st.i !== P.idx) {
-        // a new countdown has begun while watching: blink, and tone / vibration if Sound is on
-        if (st.i > P.idx) { P.blinkAt = P.startAt + P.cum[st.i]; signal(); }
-        P.idx = st.i;
-      }
+      const c = chainAt(t - P.startAt);
+      if (c.over) { finish(c.ms); return; }
+      if (c.k !== P.idx) { if (c.k > P.idx) signal(); P.idx = c.k; } // a new section while watching: tone / vibration if Sound is on
+      g = segs[c.k];
+      const timer = isTimer(g);
+      pl.classList.toggle('timer', timer);
+      // a countdown shows the time left, a timer the time elapsed; both blink in time for three
+      // seconds when they begin, except the section the run starts from with Start
+      text = timer ? fmt(Math.floor(c.ms / 1000)) : fmt(Math.ceil((g.s * 1000 - c.ms) / 1000));
+      lit = (c.k > P.base || P.fresh) ? blinkLit(c.ms - (c.k === P.base ? P.off : 0)) : true;
+      label.textContent = P.pausedAt !== null ? `Paused · ${c.k + 1}/${n}` : `${c.k + 1}/${n} · ${P.w.name}${timer ? ' · timer' : ''}`;
+      if (timer && $('nextPiece').textContent !== 'Next ›') $('nextPiece').textContent = 'Next ›';
+      $('nextPiece').disabled = !timer;
+    } else if (P.mode === 'done') {
+      g = segs[n - 1]; text = fmt(0); lit = blinkLit(t - P.doneAt);
+      label.textContent = `End · ${P.w.name}`;
+    } else return;
+    colors(g.bg, g.fg);
+    if (cur.text !== text || cur.fg !== g.fg || cur.lit !== lit) {
+      cur = { text, fg: g.fg, lit }; digits.setAttribute('aria-label', text); draw();
     }
-    if (P.mode === 'done') { const s = P.w.segments[n - 1]; st = { i: n - 1, text: fmt(0), bg: s.bg, fg: s.fg }; }
-    const lit = blinkLit(t - P.blinkAt);
-    colors(st.bg, st.fg);
-    if (cur.text !== st.text || cur.fg !== st.fg || cur.lit !== lit) {
-      cur = { text: st.text, fg: st.fg, lit }; digits.setAttribute('aria-label', st.text); draw();
-    }
-    label.textContent = P.mode === 'done' ? `End · ${P.w.name}`
-                      : P.pausedAt !== null ? `Paused · ${st.i + 1}/${n}` : `${st.i + 1}/${n} · ${P.w.name}`;
   }
   function loop() {
+    cancelAnimationFrame(raf);
     render();
-    const blinking = P.mode === 'done' && now() - P.blinkAt < BLINK_BEATS * 1000 + 100;
+    const blinking = P.mode === 'done' && now() - P.doneAt < BLINK_BEATS * 1000 + 100;
     if ((P.mode === 'run' && P.pausedAt === null) || blinking) raf = requestAnimationFrame(loop);
   }
 
@@ -754,8 +808,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 
   function start() {
     unlockAudio(); stopClock();
-    // from the position of the seek bar: the clock starts as if that much time had already run
-    setMode('run'); P.startAt = Date.now() - (P.seek || 0); P.idx = at(P.seek || 0).i;
+    // from the position of the seek bar: a chain starting there, as if that much of the section had run
+    setMode('run'); P.base = P.seek.k; P.off = P.seek.ms; P.startAt = Date.now(); P.fresh = false; P.idx = P.seek.k;
     mainB.textContent = 'Pause'; $('reset').textContent = 'Reset'; $('reset').disabled = false;
     cur = { text: '', fg: '', lit: true };
     keepAwake(); loop(); immerse(); goFull();
@@ -763,41 +817,66 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   function pause() { P.pausedAt = Date.now(); pl.classList.add('paused'); mainB.textContent = 'Resume'; cancelAnimationFrame(raf); render(); immerse(); }
   function resume() {
     unlockAudio(); const d = Date.now() - P.pausedAt;
-    P.startAt += d; P.blinkAt += d; P.pausedAt = null;
+    P.startAt += d; P.pausedAt = null;
     pl.classList.remove('paused'); mainB.textContent = 'Pause'; loop(); immerse();
   }
-  // ---- seek bar: start position, in whole seconds, from 0:00 to one second before the end ----
-  function setSeek(ms) {
-    const tot = P.cum[P.cum.length - 1];
-    P.seek = Math.max(0, Math.min(tot - 1000, Math.round(ms / 1000) * 1000));
-    const st = at(P.seek), n = P.w.segments.length;
+  // moving on from a timer: a new chain at the next section, which blinks as it begins; after the
+  // last section the piece is over. Works from a paused timer too, and resumes.
+  function advance() {
+    if (!P || P.mode !== 'run') return;
+    const c = chainAt(now() - P.startAt);
+    if (c.over || !isTimer(P.w.segments[c.k])) return;
+    const paused = P.pausedAt !== null;
+    P.pausedAt = null; pl.classList.remove('paused'); mainB.textContent = 'Pause';
+    P.base = c.k + 1; P.off = 0; P.startAt = Date.now(); P.fresh = true;
+    if (P.base >= P.w.segments.length) { finish(0); return; }
+    loop(); if (paused) immerse();
+  }
+
+  // ---- seek bar: start position, {k: section, ms: into it} in whole seconds; a timer starts from its beginning ----
+  const secLen = k => isTimer(P.w.segments[k]) ? 0 : P.w.segments[k].s * 1000;
+  function lastPos() { const n = P.w.segments.length, L = secLen(n - 1); return { k: n - 1, ms: L ? L - 1000 : 0 }; }
+  function setSeek(pos) {
+    const n = P.w.segments.length;
+    let k = Math.max(0, Math.min(n - 1, pos.k | 0)), L = secLen(k);
+    let ms = L ? Math.max(0, Math.min(L - 1000, Math.round(pos.ms / 1000) * 1000)) : 0;
+    P.seek = { k, ms };
+    const g = P.w.segments[k], last = lastPos();
     placeHead();
-    $('scrub').setAttribute('aria-valuemax', tot / 1000); $('scrub').setAttribute('aria-valuenow', P.seek / 1000);
-    $('seekPos').textContent = P.seek
-      ? `From ${fmtDur(P.seek / 1000)} · ${st.i + 1}/${n} · ${st.text} left`
-      : 'From 0:00';
-    $('seekHome').disabled = $('seekMinus').disabled = P.seek === 0;
-    $('seekPlus').disabled = P.seek >= tot - 1000;
-    colors(st.bg, st.fg); // the title takes the colours of the countdown it will start from
+    // the absolute time is shown only when no timer comes before: after a timer it is not known
+    const before = P.w.segments.slice(0, k), abs = before.some(isTimer) ? null : before.reduce((a, s) => a + s.s, 0) * 1000 + ms;
+    const what = isTimer(g) ? 'timer' : `${fmt(Math.ceil((L - ms) / 1000))} left`;
+    $('seekPos').textContent = (k === 0 && ms === 0) ? 'From the beginning'
+      : abs !== null ? `From ${fmtDur(abs / 1000)} · ${k + 1}/${n} · ${what}` : `From ${k + 1}/${n} · ${what}`;
+    $('seekHome').disabled = $('seekMinus').disabled = k === 0 && ms === 0;
+    $('seekPlus').disabled = k === last.k && ms >= last.ms;
+    $('scrub').setAttribute('aria-valuetext', $('seekPos').textContent);
+    colors(g.bg, g.fg); // the title takes the colours of the section it will start from
+  }
+  // one second earlier or later; across sections, a timer counts as a single position
+  function stepSeek(d) {
+    let { k, ms } = P.seek;
+    if (d > 0) { if (secLen(k) && ms + 1000 < secLen(k)) ms += 1000; else if (k + 1 < P.w.segments.length) { k++; ms = 0; } }
+    else { if (ms >= 1000) ms -= 1000; else if (k > 0) { k--; ms = secLen(k) ? secLen(k) - 1000 : 0; } }
+    setSeek({ k, ms });
   }
   // Time and position are mapped on the coloured sections themselves, not on the whole bar:
   // the gaps between sections would otherwise shift the head away from the colours.
   function placeHead() {
-    const spans = $('plStrip').children, i = Math.min(at(P.seek).i, spans.length - 1);
-    if (!spans.length) return;
-    const bar = $('scrub').getBoundingClientRect(), r = spans[i].getBoundingClientRect();
-    const f = (P.seek - P.cum[i]) / (P.cum[i + 1] - P.cum[i]);
-    const x = r.left - bar.left + f * r.width;
-    $('head').style.left = x + 'px'; $('past').style.width = (P.seek ? x : 0) + 'px';
+    const spans = $('plStrip').children, k = P.seek.k;
+    if (!spans[k]) return;
+    const bar = $('scrub').getBoundingClientRect(), r = spans[k].getBoundingClientRect();
+    const L = secLen(k), x = r.left - bar.left + (L ? P.seek.ms / L : 0) * r.width;
+    $('head').style.left = x + 'px'; $('past').style.width = (k || P.seek.ms ? x : 0) + 'px';
   }
   new ResizeObserver(() => { if (P && P.mode === 'title') placeHead(); }).observe($('scrub'));
   const seekFromPointer = e => {
     const spans = [...$('plStrip').children], x = e.clientX;
-    let i = spans.findIndex(sp => x < sp.getBoundingClientRect().right);
-    if (i < 0) { setSeek(P.cum[P.cum.length - 1]); return; }
-    const r = spans[i].getBoundingClientRect();
+    let k = spans.findIndex(sp => x < sp.getBoundingClientRect().right);
+    if (k < 0) { setSeek(lastPos()); return; }
+    const r = spans[k].getBoundingClientRect();
     const f = Math.max(0, Math.min(1, (x - r.left) / r.width)); // in a gap: start of the next section
-    setSeek(P.cum[i] + f * (P.cum[i + 1] - P.cum[i]));
+    setSeek({ k, ms: f * secLen(k) });
   };
   $('scrub').addEventListener('pointerdown', e => {
     if (!P || P.mode !== 'title') return;
@@ -810,15 +889,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     const stop = () => { clearTimeout(t); clearInterval(iv); };
     btn.addEventListener('pointerdown', e => {
       if (!P || P.mode !== 'title') return;
-      e.preventDefault(); setSeek(P.seek + d);
-      t = setTimeout(() => { iv = setInterval(() => setSeek(P.seek + d), 70); }, 400);
+      e.preventDefault(); stepSeek(d);
+      t = setTimeout(() => { iv = setInterval(() => stepSeek(d), 70); }, 400);
     });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(k => btn.addEventListener(k, stop));
   }
-  stepper($('seekMinus'), -1000); stepper($('seekPlus'), 1000);
-  $('seekHome').addEventListener('click', () => { if (P && P.mode === 'title') setSeek(0); });
+  stepper($('seekMinus'), -1); stepper($('seekPlus'), 1);
+  $('seekHome').addEventListener('click', () => { if (P && P.mode === 'title') setSeek({ k: 0, ms: 0 }); });
 
-  // the two pedals, and the two buttons that mirror them
+  // the two pedals, and the buttons that mirror them
+  const inTimer = () => P && P.mode === 'run' && pl.classList.contains('timer');
   function mainAction() {
     if (!P) return;
     if (P.mode === 'title') start();
@@ -839,7 +919,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   }
   mainB.addEventListener('click', mainAction);
   $('reset').addEventListener('click', backButton);
-  $('nextPiece').addEventListener('click', () => { if (P && P.list && P.mode === 'title' && P.i + 1 < P.seq.length) toTitle(P.i + 1, false); });
+  // Next ›: on a title, the next piece of the setlist; on a timer, the next section
+  $('nextPiece').addEventListener('click', () => {
+    if (!P) return;
+    if (P.mode === 'title') { if (P.list && P.i + 1 < P.seq.length) toTitle(P.i + 1, false); }
+    else if (inTimer()) advance();
+  });
   $('plBack').addEventListener('click', () => {
     if (P) stopClock();
     try { wake && wake.release(); } catch (e) {} wake = null;
@@ -851,8 +936,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   });
   $('sound').addEventListener('click', e => { sound = !sound; e.currentTarget.setAttribute('aria-pressed', sound); if (sound) { unlockAudio(); beep(); } });
 
+  // ---- right pedal held on a timer: the next section after HOLD_MS, a ring filling meanwhile ----
+  // On a timer the right pedal acts when released (Pause / Resume), or after HOLD_MS if still held
+  // (next section), so a hold never pauses first. Elsewhere it acts at once, as before.
+  const HOLD_MS = 2000;
+  let hold = null;
+  function holdStart() {
+    holdCancel();
+    // the ring is an SVG element: it has no `hidden` property, so the attribute is toggled
+    const ring = $('hold'); ring.removeAttribute('hidden'); ring.classList.remove('fill'); ring.getBoundingClientRect(); ring.classList.add('fill');
+    hold = { done: false, t: setTimeout(() => { hold.done = true; ring.setAttribute('hidden', ''); advance(); }, HOLD_MS) };
+  }
+  function holdCancel() { if (hold) clearTimeout(hold.t); hold = null; const ring = $('hold'); if (ring) { ring.setAttribute('hidden', ''); ring.classList.remove('fill'); } }
+
   // Bluetooth page-turner pedal, as in Élan. Right (forward): Start on a title, Pause and Resume on
-  // a countdown. Left (back): Reset to the title of the piece; nothing on a title. Only in the player.
+  // a countdown; on a timer, Pause and Resume when released, next section when held 2 s.
+  // Left (back): Reset to the title of the piece; nothing on a title. Only in the player.
   const PEDAL_MAIN = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
   const PEDAL_BACK = ['ArrowLeft', 'ArrowUp', 'PageUp'];
   const pedalOn = () => view === 'player' && $('about').hidden;
@@ -863,9 +962,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
     e.preventDefault();
     if (e.repeat) return;
     if (document.activeElement && document.activeElement !== body) document.activeElement.blur();
+    if (toMain && inTimer()) { holdStart(); return; }
     toMain ? mainAction() : backAction();
   }, true);
-  document.addEventListener('keyup', e => { if (e.key === ' ' && pedalOn()) e.preventDefault(); }, true);
+  document.addEventListener('keyup', e => {
+    if (!pedalOn()) return;
+    if (e.key === ' ') e.preventDefault();
+    if (PEDAL_MAIN.includes(e.key) && hold) { const done = hold.done; holdCancel(); if (!done) mainAction(); }
+  }, true);
 
   // full screen: on Start, or from the button (inside the Android app the app handles it)
   const isFull = () => document.fullscreenElement || document.webkitFullscreenElement;

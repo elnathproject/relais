@@ -1,0 +1,1 @@
+Timers: + Add timer adds a section of open length to a piece. It counts up from 0:00 until you move on: hold the right pedal for 2 seconds, or tap Next, to go to the next section; a short press pauses and resumes. Also in the web version for ensembles.

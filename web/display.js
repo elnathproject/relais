@@ -81,8 +81,7 @@
         last.seekKey = key;
         Relais.strip($('strip'), v.piece);
         Relais.placeHead($('scrub'), $('strip'), $('head'), $('past'), v.piece, v.seek);
-        const c = Relais.cums(v.piece), t = Relais.segIndex(c, v.seek);
-        $('pos').textContent = v.seek ? `From ${Relais.fmtDur(v.seek / 1000)} · ${t + 1}/${v.n} · ${Relais.fmt(Math.ceil((c[t + 1] - v.seek) / 1000))} left` : 'From 0:00';
+        $('pos').textContent = Relais.seekText(v.piece, v.seek);
       }
     } else if (v.kind === 'end') {
       colors(v.bg, v.fg); setTitle('End', last.kind === 'run');
@@ -94,7 +93,7 @@
       if (v.kind === 'done' && last.kind === 'run') vibrate();
       Relais.draw($('digits'), $('fit'), v.text, v.fg, v.lit);
       label.textContent = v.kind === 'done' ? `End · ${v.piece.name}` : v.paused ? `Paused · ${v.i + 1}/${v.n}`
-                        : v.waiting ? 'Starting' : `${v.i + 1}/${v.n} · ${v.piece.name}`;
+                        : v.waiting ? 'Starting' : `${v.i + 1}/${v.n} · ${v.piece.name}${v.timer ? ' · timer' : ''}`;
     }
     // a title box hidden until now has no size: fit it again whenever the kind of screen changes
     if (v.kind !== last.kind) Relais.fitTitle($('ttl'), $('ttlBox'));

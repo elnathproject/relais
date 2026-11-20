@@ -96,8 +96,9 @@
   const HEX = /^#[0-9a-f]{6}$/i, MAX_S = 999 * 60 + 59;
   const cleanPiece = w => {
     if (!w || typeof w !== 'object' || !Array.isArray(w.segments)) return null;
-    const segs = w.segments.slice(0, 99).filter(s => s && HEX.test(s.bg) && HEX.test(s.fg) && isFinite(+s.s))
-      .map(s => ({ s: Math.max(1, Math.min(MAX_S, Math.round(+s.s))), bg: s.bg.toLowerCase(), fg: s.fg.toLowerCase() }));
+    const segs = w.segments.slice(0, 99).filter(s => s && HEX.test(s.bg) && HEX.test(s.fg) && (s.t === 'timer' || isFinite(+s.s)))
+      .map(s => s.t === 'timer' ? { t: 'timer', bg: s.bg.toLowerCase(), fg: s.fg.toLowerCase() }
+                                : { s: Math.max(1, Math.min(MAX_S, Math.round(+s.s))), bg: s.bg.toLowerCase(), fg: s.fg.toLowerCase() });
     return segs.length ? { name: String(w.name ?? '').slice(0, 60), segments: segs } : null;
   };
   const cleanLib = x => {
@@ -114,7 +115,6 @@
   let cur = null;
   try { cur = JSON.parse(sessionStorage.getItem('relais.cur') || 'null'); } catch (e) {}
   const saveCur = () => { try { sessionStorage.setItem('relais.cur', JSON.stringify(cur)); } catch (e) {} };
-  const total = w => w.segments.reduce((a, s) => a + s.s, 0);
 
   function renderLib() {
     const box = $('libList'); box.textContent = '';
@@ -131,8 +131,8 @@
         const loaded = cur && cur.li === li && cur.i === wi && S && S.mode !== 'idle' && S.piece && S.piece.name === w.name;
         pieces.append(h('div', { className: 'piece' },
           h('div', { className: 'piecebody' + (loaded ? ' loaded' : '') },
-            h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: Relais.fmtDur(total(w)) })),
-            st, h('div', { className: 'durs', textContent: w.segments.map(s => Relais.fmtDur(s.s)).join(' · ') })),
+            h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: Relais.totalText(w) })),
+            st, h('div', { className: 'durs', textContent: w.segments.map(Relais.durText).join(' · ') })),
           h('button', { className: 'mini go', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => { loadPiece(li, wi, false); showView('player'); } })));
       });
       box.append(h('div', { className: 'sl' },
@@ -160,7 +160,7 @@
     const l = lib.setlists[li]; if (!l || !l.pieces[i]) return;
     cur = { li, i, list }; saveCur(); pendingSeek = null; clearTimeout(seekTimer);
     send('load', { piece: l.pieces[i], next: list ? (l.pieces[i + 1] || null) : null, list, setlist: l.name,
-                   pos: list ? i : 0, count: list ? l.pieces.length : 1, seek: opts.seek || 0, start: !!opts.start });
+                   pos: list ? i : 0, count: list ? l.pieces.length : 1, seek: { k: 0, ms: 0 }, start: !!opts.start });
   }
   // this page knows the setlist on the displays (for Prev, Next and the following pieces) only if it loaded it
   const mine = () => cur && S && S.piece && lib.setlists[cur.li] && lib.setlists[cur.li].name === S.setlist
@@ -183,7 +183,7 @@
     const v = Relais.view(S);
     if (v.kind === 'title') {
       // a start position still on its way goes first, so the piece starts from it
-      if (pendingSeek !== null) { clearTimeout(seekTimer); const ms = pendingSeek; await send('seek', { ms }); if (pendingSeek === ms) pendingSeek = null; }
+      if (pendingSeek !== null) { clearTimeout(seekTimer); const pos = pendingSeek; await send('seek', pos); if (pendingSeek === pos) pendingSeek = null; }
       send('start');
     }
     else if (v.kind === 'next') { if (mine()) loadPiece(cur.li, cur.i + 1, true, { start: true }); }
@@ -204,11 +204,32 @@
   }
   mainB.addEventListener('click', mainAction);
   $('reset').addEventListener('click', backButton);
+  // moving on from the timer the run is on: every display goes to the next section together
+  function advance() {
+    const v = S ? Relais.view(S) : null;
+    if (v && v.kind === 'run' && v.timer) send('advance', { k: v.i });
+  }
+  // Next ›: on a title, the next piece of the setlist; on a timer, the next section
   $('nextPiece').addEventListener('click', () => {
     const v = S ? Relais.view(S) : null;
-    if (!v || !mine() || !cur.list) return;
+    if (!v) return;
+    if (v.kind === 'run' && v.timer) { advance(); return; }
+    if (!mine() || !cur.list) return;
     if (v.kind === 'title' && cur.i + 1 < lib.setlists[cur.li].pieces.length) loadPiece(cur.li, cur.i + 1, true);
   });
+
+  // ---- right pedal held on a timer: the next section after HOLD_MS, a ring filling meanwhile ----
+  // On a timer the right pedal acts when released (Pause / Resume), or after HOLD_MS if still held
+  // (next section), so a hold never pauses first. Elsewhere it acts at once.
+  const HOLD_MS = 2000;
+  let hold = null;
+  const inTimer = () => { const v = S ? Relais.view(S) : null; return !!(v && v.kind === 'run' && v.timer); };
+  function holdStart() {
+    holdCancel();
+    const ring = $('hold'); ring.removeAttribute('hidden'); ring.classList.remove('fill'); ring.getBoundingClientRect(); ring.classList.add('fill');
+    hold = { done: false, t: setTimeout(() => { hold.done = true; ring.setAttribute('hidden', ''); advance(); }, HOLD_MS) };
+  }
+  function holdCancel() { if (hold) clearTimeout(hold.t); hold = null; $('hold').setAttribute('hidden', ''); $('hold').classList.remove('fill'); }
 
   // Bluetooth page-turner pedal or keyboard, as in the app
   const PEDAL_MAIN = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
@@ -222,22 +243,27 @@
     e.preventDefault();
     if (e.repeat) return;
     if (document.activeElement && document.activeElement !== body) document.activeElement.blur();
+    if (toMain && inTimer()) { holdStart(); return; }
     toMain ? mainAction() : backAction();
   }, true);
-  document.addEventListener('keyup', e => { if (e.key === ' ' && $('login').hidden && $('prefs').hidden && $('qr').hidden && view === 'player') e.preventDefault(); }, true);
+  document.addEventListener('keyup', e => {
+    if (!($('login').hidden && $('prefs').hidden && $('qr').hidden && view === 'player')) return;
+    if (e.key === ' ') e.preventDefault();
+    if (PEDAL_MAIN.includes(e.key) && hold) { const done = hold.done; holdCancel(); if (!done) mainAction(); }
+  }, true);
 
   // ---- seek bar on the title: shown at once here, sent to the displays shortly after ----
   let seekTimer = 0;
-  function setSeek(ms) {
+  // the start position is {k: section, ms: into it}, as in the app
+  function setSeek(pos) {
     if (!S || S.mode !== 'title') return;
-    const tot = Relais.cums(S.piece).at(-1);
-    S.seek = pendingSeek = Math.max(0, Math.min(tot - 1000, Math.round(ms / 1000) * 1000));
+    S.seek = pendingSeek = Relais.clampSeek(S.piece, pos);
     seekKey = ''; // redraw the bar
     clearTimeout(seekTimer);
     seekTimer = setTimeout(async () => {
-      const ms = pendingSeek;
-      await send('seek', { ms });
-      if (pendingSeek === ms) pendingSeek = null; // confirmed; a newer position keeps waiting
+      const p = pendingSeek;
+      await send('seek', p);
+      if (pendingSeek === p) pendingSeek = null; // confirmed; a newer position keeps waiting
     }, 150);
   }
   $('scrub').addEventListener('pointerdown', e => {
@@ -250,13 +276,13 @@
     const stop = () => { clearTimeout(t); clearInterval(iv); };
     btn.addEventListener('pointerdown', e => {
       if (!S || S.mode !== 'title') return;
-      e.preventDefault(); setSeek(S.seek + d);
-      t = setTimeout(() => { iv = setInterval(() => setSeek(S.seek + d), 70); }, 400);
+      e.preventDefault(); setSeek(Relais.stepSeek(S.piece, S.seek, d));
+      t = setTimeout(() => { iv = setInterval(() => setSeek(Relais.stepSeek(S.piece, S.seek, d)), 70); }, 400);
     });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(k => btn.addEventListener(k, stop));
   }
-  stepper($('seekMinus'), -1000); stepper($('seekPlus'), 1000);
-  $('seekHome').addEventListener('click', () => setSeek(0));
+  stepper($('seekMinus'), -1); stepper($('seekPlus'), 1);
+  $('seekHome').addEventListener('click', () => setSeek({ k: 0, ms: 0 }));
 
   // ---- settings: vibration, address, QR code ----
   function displayAddress() {
@@ -332,6 +358,8 @@
     body.dataset.kind = v.kind;
     body.classList.toggle('paused', !!v.paused);
     body.classList.toggle('waiting', !!v.waiting);
+    body.classList.toggle('timer', !!(v.kind === 'run' && v.timer));
+    if (hold && !(v.kind === 'run' && v.timer)) holdCancel(); // the timer is over: nothing to hold for
     const lab = $('label'), sl = mine() ? lib.setlists[cur.li] : null;
     if (v.kind === 'idle') {
       colors('#0d0f10', '#f2a541'); setTitle('No piece loaded', false);
@@ -347,16 +375,16 @@
         seekKey = key;
         Relais.strip($('plStrip'), v.piece);
         Relais.placeHead($('scrub'), $('plStrip'), $('head'), $('past'), v.piece, v.seek);
-        const c = Relais.cums(v.piece), t = Relais.segIndex(c, v.seek), tot = c.at(-1);
-        $('seekPos').textContent = v.seek ? `From ${Relais.fmtDur(v.seek / 1000)} · ${t + 1}/${v.n} · ${Relais.fmt(Math.ceil((c[t + 1] - v.seek) / 1000))} left` : 'From 0:00';
-        $('plDurs').textContent = v.piece.segments.map(s => Relais.fmtDur(s.s)).join(' · ') + ' = ' + Relais.fmtDur(tot / 1000);
-        const editable = v.kind === 'title';
-        $('seekHome').disabled = $('seekMinus').disabled = !editable || v.seek === 0;
-        $('seekPlus').disabled = !editable || v.seek >= tot - 1000;
+        $('seekPos').textContent = Relais.seekText(v.piece, v.seek);
+        $('plDurs').textContent = v.piece.segments.map(Relais.durText).join(' · ') + ' = ' + Relais.totalText(v.piece);
+        const editable = v.kind === 'title', atStart = v.seek.k === 0 && v.seek.ms === 0, nx = Relais.stepSeek(v.piece, v.seek, 1);
+        $('seekHome').disabled = $('seekMinus').disabled = !editable || atStart;
+        $('seekPlus').disabled = !editable || (nx.k === v.seek.k && nx.ms === v.seek.ms);
       }
       mainB.textContent = 'Start'; mainB.disabled = v.kind === 'next' && !mine();
       $('reset').textContent = '‹ Prev';
       $('reset').disabled = !(v.kind === 'title' && mine() && cur.list && cur.i > 0);
+      $('nextPiece').textContent = 'Next ›';
       $('nextPiece').disabled = !(v.kind === 'title' && mine() && cur.list && sl && cur.i + 1 < sl.pieces.length);
       // the piece on the displays is over: this page makes the next one the current one, so that every
       // further command (start, seek, previous) applies to it. The displays already show its title.
@@ -369,7 +397,8 @@
       colors(v.bg, v.fg);
       Relais.draw($('digits'), $('fit'), v.text, v.fg, v.lit);
       lab.textContent = v.kind === 'done' ? `End · ${v.piece.name}` : S.until !== null ? `Paused · ${v.i + 1}/${v.n}`
-                      : v.waiting ? 'Starting…' : `${v.i + 1}/${v.n} · ${v.piece.name}`;
+                      : v.waiting ? 'Starting…' : `${v.i + 1}/${v.n} · ${v.piece.name}${v.timer ? ' · timer' : ''}`;
+      $('nextPiece').disabled = !(v.kind === 'run' && v.timer);
       mainB.textContent = v.kind === 'done' ? 'End' : S.until !== null ? 'Resume' : 'Pause';
       mainB.disabled = v.kind === 'done';
       $('reset').textContent = 'Reset'; $('reset').disabled = false;

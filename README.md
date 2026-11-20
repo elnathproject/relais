@@ -20,12 +20,13 @@ From left: the setlists; editing a piece; the title of a piece, waiting for the 
 ## Features
 
 - **Sequential countdowns.** Each piece holds up to 99 countdowns, from one second to 999:59. At zero the next countdown starts without any input.
+- **Timers.** Besides countdowns, a piece can hold timers: sections of open length that count up from 0:00 until the performer moves on. Hold the right pedal for 2 seconds (a ring fills meanwhile), or tap *Next ›*, to go to the next section; a short press pauses and resumes. In the coloured bars a timer is striped.
 - **Colours per countdown.** Every countdown has its own background and digit colour, chosen freely or from ready-made pairs, so the sections of a piece can be told apart at a glance.
 - **Blinking in time.** When a new countdown begins, its digits blink for three seconds in step with the seconds: each new value appears lit at the instant it changes, so the count is never hidden.
 - **Setlists played in order.** Start a setlist and every piece opens on its title, shown full screen and static until you start it. When the last countdown of a piece ends, the title of the next piece appears; after the last piece, an end screen.
 - **Start from any point.** On the title of a piece, the coloured bar works like the progress bar of an audio player: tap or drag the head, or step it a second at a time, and Start begins from that point, for example from 0:31, in the colours of the countdown it falls in. Reset brings back the same point, to rehearse a passage again; the next piece of a setlist starts from 0:00.
 - **Single pieces.** Start a piece on its own and it stops at 00:00 when its last countdown ends.
-- **Foot pedal.** A Bluetooth page-turner pedal, like those used for PDF scores, controls the player. On a title, right starts the countdown. On a countdown, right pauses and resumes, left resets to the title. Arrow keys, Page Up/Down, Space and Enter are all recognised, so any pedal mode pieces, as does a Bluetooth keyboard.
+- **Foot pedal.** A Bluetooth page-turner pedal, like those used for PDF scores, controls the player. On a title, right starts the piece. On a countdown, right pauses and resumes, left resets to the title. On a timer, a short press of right pauses and resumes, holding it for 2 seconds moves on. Holding needs a pedal that keeps reporting the key while pressed, as most do; *Next ›* on screen works in any case. Arrow keys, Page Up/Down, Space and Enter are all recognised, so any pedal mode pieces, as does a Bluetooth keyboard.
 - **Ordering.** Setlists, pieces and countdowns can be moved up and down; pieces and countdowns can be duplicated.
 - **Import and export.** Each setlist, or the whole library, can be saved as a JSON file and imported on another device. Importing adds the setlists in the file to those already there.
 - **Silent by default.** Sound starts off every time the player opens. Turn it on to get a double tone and a vibration at each change.
@@ -55,7 +56,7 @@ The `web/` folder holds a web version for a group of musicians: a conductor play
 }
 ```
 
-`s` is the length in seconds, `bg` and `fg` the background and digit colours. Values out of range are corrected on import; a file without setlists is refused.
+A timer is written `{ "t": "timer", "bg": "#14301f", "fg": "#4cff7a" }`, with no length. `s` is the length in seconds, `bg` and `fg` the background and digit colours. Values out of range are corrected on import; a file without setlists is refused.
 
 ## Installing
 
