@@ -1,6 +1,6 @@
 # Relais
 
-Relais is an Android timer for performers. A **piece** is a chain of countdowns: when one reaches zero, the next one starts by itself, each with its own background and digit colours. Pieces are kept in **setlists**, played in order: a title screen before each piece, and the next title as soon as a piece ends. The digits are drawn as seven-segment LED figures and fill the whole screen, as in its sibling app [Élan](https://github.com/elnathproject/ELAN).
+Relais is an Android timer for performers. A **piece** is a chain of sections, each with its own background and digit colours: countdowns, which hand over to the next section by themselves at zero, and timers, which count up until the performer moves on. Pieces are kept in **setlists**, played in order: a title screen before each piece, and the next title as soon as a piece ends. The digits are drawn as seven-segment LED figures and fill the whole screen, as in its sibling app [Élan](https://github.com/elnathproject/ELAN).
 
 ## Screenshots
 
