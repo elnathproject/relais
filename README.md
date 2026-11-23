@@ -38,7 +38,7 @@ Time is always computed from the system clock rather than by counting ticks, so 
 
 ## For ensembles: web version
 
-The `web/` folder holds a web version for a group of musicians: a conductor plays the setlists exported from the app on a password-protected page, and the performers follow the same screens full screen on their phones or tablets, by opening an address or scanning a QR code, with no app to install. All displays change countdown together. It runs on ordinary PHP web hosting; see [web/README.md](web/README.md).
+The `web/` folder holds a web version for a group of musicians: a conductor prepares and plays the setlists on a password-protected page, with the same editor as the app, and the performers follow the same screens full screen on their phones or tablets, by opening an address or scanning a QR code, with no app to install. All displays change countdown together. It runs on ordinary PHP web hosting; see [web/README.md](web/README.md).
 
 ## Exchange file
 
@@ -72,7 +72,7 @@ To update, install the new APK over the old one. If Android refuses because the 
 
 ## Project structure
 
-- `app/src/main/assets/index.html`: the app itself, meaning the setlists, the editor, the player, the digit drawing and the timing logic. It also runs in a desktop or mobile browser for quick testing.
+- `web/app/index.html` and `web/app/app.js`: the app itself, meaning the setlists, the editor, the player, the digit drawing and the timing logic. The APK takes them as its assets (`sourceSets` in `app/build.gradle.kts`), and the web version opens them as the conductor's setlist editor. They also run in a desktop or mobile browser for quick testing.
 - `app/src/main/java/com/ciccarelli/relais/MainActivity.kt`: the Android window that hosts the page full screen, keeps the screen on, handles vibration, the back button and the system file picker for import and export, and opens external links in the browser.
 - `app/src/main/AndroidManifest.xml`: name, icon, automatic rotation and permissions (vibration only).
 - `.github/workflows/build.yml`: the automatic build on GitHub.

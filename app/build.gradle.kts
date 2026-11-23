@@ -15,6 +15,14 @@ android {
         versionName = "0.6.0"
     }
 
+    // The interface of the app (index.html, app.js) lives in web/app/: the same files are the
+    // conductor's editor of setlists in the web version, so the two can never drift apart.
+    sourceSets {
+        getByName("main") {
+            assets.setSrcDirs(listOf("../web/app"))
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

@@ -66,7 +66,7 @@
       }
       token = j.token; ss.set('relais.token', token, remember);
       $('login').hidden = true; $('pw').value = ''; $('loginMsg').textContent = '';
-      showView(S.mode === 'idle' ? 'lib' : 'player');
+      pickUp();
     } catch (err) { if (err.message !== 'https') $('loginMsg').textContent = 'The server does not answer.'; }
   });
   $('logout').addEventListener('click', async () => {
@@ -107,53 +107,23 @@
     return { setlists: wls.filter(l => l && typeof l === 'object').map(l => ({ name: String(l.name ?? '').slice(0, 60),
              pieces: (Array.isArray(l.pieces) ? l.pieces : []).map(cleanPiece).filter(Boolean) })) };
   };
-  let lib = null;
-  try { lib = cleanLib(JSON.parse(localStorage.getItem('relais.web.library') || 'null')); } catch (e) {}
-  if (!lib) lib = { setlists: [] };
-  const saveLib = () => { try { localStorage.setItem('relais.web.library', JSON.stringify(lib)); } catch (e) {} };
+  // The setlists are those of the editor (app/index.html, the same page as the Android app), kept in
+  // this browser under the key the app uses; read again whenever they may have changed.
+  const readLib = () => { try { return cleanLib(JSON.parse(localStorage.getItem('relais-library-v1') || 'null')) || { setlists: [] }; } catch (e) { return { setlists: [] }; } };
+  let lib = readLib();
+  window.addEventListener('storage', e => { if (e.key === 'relais-library-v1') lib = readLib(); });
   // what this page loaded last: setlist index, piece index, played as a setlist
   let cur = null;
   try { cur = JSON.parse(sessionStorage.getItem('relais.cur') || 'null'); } catch (e) {}
   const saveCur = () => { try { sessionStorage.setItem('relais.cur', JSON.stringify(cur)); } catch (e) {} };
-
-  function renderLib() {
-    const box = $('libList'); box.textContent = '';
-    $('libNote').textContent = lib.setlists.length ? 'Importing replaces the setlists below.' : '';
-    if (!lib.setlists.length) {
-      box.append(h('p', { className: 'empty', textContent: 'No setlists yet. In the Relais app, tap Export at the top of the setlists, then import that file here. The setlists stay in this browser.' }));
-      return;
-    }
-    lib.setlists.forEach((l, li) => {
-      const pieces = h('div', { className: 'pieces' });
-      if (!l.pieces.length) pieces.append(h('div', { className: 'small', textContent: 'No pieces.' }));
-      l.pieces.forEach((w, wi) => {
-        const st = h('div', { className: 'strip' }); Relais.strip(st, w);
-        const loaded = cur && cur.li === li && cur.i === wi && S && S.mode !== 'idle' && S.piece && S.piece.name === w.name;
-        pieces.append(h('div', { className: 'piece' },
-          h('div', { className: 'piecebody' + (loaded ? ' loaded' : '') },
-            h('div', { className: 'row1' }, h('span', { className: 'wname', textContent: w.name }), h('span', { className: 'total', textContent: Relais.totalText(w) })),
-            st, h('div', { className: 'durs', textContent: w.segments.map(Relais.durText).join(' · ') })),
-          h('button', { className: 'mini go', textContent: '▶', ariaLabel: `Start ${w.name} alone`, onclick: () => { loadPiece(li, wi, false); showView('player'); } })));
-      });
-      box.append(h('div', { className: 'sl' },
-        h('div', { className: 'slhead' }, h('span', { className: 'nm', textContent: l.name }),
-          h('button', { className: 'btn primary', textContent: '▶ Start', disabled: !l.pieces.length, ariaLabel: `Start the setlist ${l.name}`,
-                        onclick: () => { loadPiece(li, 0, true); showView('player'); } })),
-        pieces));
-    });
+  // ▶ or Start pressed in the editor: the piece handed over comes to the displays (within ten minutes)
+  function pickUp() {
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem('relais.conductor.play') || 'null'); localStorage.removeItem('relais.conductor.play'); } catch (e) {}
+    if (!r || !(Date.now() - r.at < 600000)) return;
+    lib = readLib();
+    loadPiece(r.li | 0, r.i | 0, !!r.list);
   }
-  $('importBtn').addEventListener('click', () => $('importFile').click());
-  $('importFile').addEventListener('change', e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    if (f.size > 1e6) { toast('File too large.'); return; }
-    f.text().then(text => {
-      let x = null; try { x = cleanLib(JSON.parse(text)); } catch (err) {}
-      if (!x || !x.setlists.length) { toast('This file holds no setlists.'); return; }
-      lib = x; cur = null; saveLib(); saveCur(); renderLib();
-      toast(`Imported ${x.setlists.length} setlist${x.setlists.length > 1 ? 's' : ''}.`);
-    });
-  });
 
   // a piece becomes the current one on every display, on its title
   function loadPiece(li, i, list, opts = {}) {
@@ -166,16 +136,9 @@
   const mine = () => cur && S && S.piece && lib.setlists[cur.li] && lib.setlists[cur.li].name === S.setlist
                      && (cur.list ? S.list && S.pos === cur.i : !S.list);
 
-  // ---- views: setlists or player ----
-  let view = 'lib';
-  function showView(v) {
-    view = v;
-    $('lib').hidden = v !== 'lib'; $('player').hidden = v !== 'player';
-    $('viewBtn').textContent = v === 'lib' ? 'Player' : 'Setlists';
-    if (v === 'lib') renderLib();
-    else { fitAll(); }
-  }
-  $('viewBtn').addEventListener('click', () => showView(view === 'lib' ? 'player' : 'lib'));
+  // ---- Setlists: the editor of the app, in this same browser tab ----
+  const view = 'player';
+  $('viewBtn').addEventListener('click', () => { location.href = 'app/index.html?conductor'; });
 
   // ---- the two pedals, and the buttons that mirror them ----
   async function mainAction() {
@@ -311,7 +274,7 @@
   $('prefsClose').addEventListener('click', () => { $('prefs').hidden = true; });
   $('prefs').addEventListener('click', e => { if (e.target.id === 'prefs') $('prefs').hidden = true; });
   $('vibrate').addEventListener('change', e => send('look', { vibrate: e.target.checked }));
-  $('clearBtn').addEventListener('click', () => { send('clear'); cur = null; saveCur(); $('prefs').hidden = true; showView('lib'); });
+  $('clearBtn').addEventListener('click', () => { send('clear'); cur = null; saveCur(); $('prefs').hidden = true; });
   $('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(displayAddress()); $('copy').textContent = 'Copied'; }
     catch (e) { $('copy').textContent = 'Select and copy'; }
@@ -363,7 +326,7 @@
     const lab = $('label'), sl = mine() ? lib.setlists[cur.li] : null;
     if (v.kind === 'idle') {
       colors('#0d0f10', '#f2a541'); setTitle('No piece loaded', false);
-      lab.textContent = view === 'lib' ? 'Setlists' : 'Waiting';
+      lab.textContent = 'No piece loaded';
       mainB.textContent = 'Start'; mainB.disabled = true; $('reset').textContent = 'Reset'; $('reset').disabled = true;
     } else if (v.kind === 'title' || v.kind === 'next') {
       colors(v.bg, v.fg);
@@ -408,8 +371,7 @@
     requestAnimationFrame(frame);
   }
 
-  renderLib();
-  if (token) { $('login').hidden = true; api('state').then(() => showView(S.mode === 'idle' ? 'lib' : 'player')).catch(() => {}); }
+  if (token) { $('login').hidden = true; api('state').then(pickUp).catch(() => {}); }
   else $('pw').focus();
   poll();
   requestAnimationFrame(frame);

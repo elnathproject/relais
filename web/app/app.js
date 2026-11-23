@@ -1,322 +1,29 @@
-<!--
-  Relais, sequential countdowns for performers.
-  Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
-  Released under the MIT License: see the LICENSE file.
--->
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Relais</title>
-<style>
-/* Three views on one page: the library (setlists and pieces), the editor of a piece, the player.
-   The player keeps Élan's layout: digits as large as the screen allows, controls hidden while time runs. */
-:root {
-  --bg: #0d0f10;
-  --panel: #171a1c;
-  --line: #2a2f32;
-  --fg: #d9dedf;
-  --muted: #7d8789;
-  --accent: #f2a541;
-  --accent-ink: #1a1205;
-  --run: #9fe3d6;
-  --seg-bg: #0d0f10;   /* player: background of the current countdown */
-  --seg-fg: #f2a541;   /* player: digits of the current countdown */
-  --seg-ink: #d9dedf;  /* player: text on the current background */
-  --font-digits: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, monospace;
-  --font-ui: "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-body {
-  background: var(--bg); color: var(--fg); font-family: var(--font-ui);
-  -webkit-tap-highlight-color: transparent; overflow: hidden;
-}
-[hidden] { display: none !important; }
-button { cursor: pointer; font-family: var(--font-ui); }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-.view {
-  position: fixed; inset: 0; display: flex; flex-direction: column;
-  padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
-}
-.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex: none; }
-.title { font: italic 400 30px Georgia, "Times New Roman", serif; color: var(--accent); margin: 0; }
-.tools { display: flex; gap: 8px; flex: none; align-items: center; }
-.iconbtn {
-  background: none; border: 1px solid var(--line); color: var(--muted);
-  font: 600 12px var(--font-ui); letter-spacing: .08em; text-transform: uppercase;
-  padding: 7px 10px; border-radius: 6px;
-}
-.iconbtn[aria-pressed="true"] { color: var(--fg); border-color: var(--muted); }
-.info { width: 34px; padding: 7px 0; font: italic 15px Georgia, "Times New Roman", serif; text-transform: none; letter-spacing: 0; }
-.scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 0 20px; }
-.small { font-size: 13px; color: var(--muted); }
-.btn {
-  background: none; border: 1px solid var(--line); color: var(--fg);
-  font: 600 13px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; padding: 9px 14px; border-radius: 8px;
-}
-.btn.primary { background: var(--accent); color: var(--accent-ink); border: none; }
-.btn.danger.armed { background: #7a2a2a; border-color: #7a2a2a; color: #fff; }
-.mini {
-  background: none; border: 1px solid var(--line); color: var(--muted);
-  width: 36px; height: 36px; border-radius: 8px; font: 400 16px var(--font-ui); padding: 0; flex: none;
-}
-.mini:disabled { opacity: .3; cursor: default; }
-.name {
-  background: none; border: none; border-bottom: 1px solid transparent; color: var(--fg);
-  font: 600 17px var(--font-ui); letter-spacing: .04em; padding: 4px 0; min-width: 0; flex: 1;
-}
-.name:focus { outline: none; border-bottom-color: var(--accent); }
-
-/* ---- Library ---- */
-.sl { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 14px; }
-.slhead { display: flex; align-items: center; gap: 6px; }
-.slhead .name { text-transform: uppercase; letter-spacing: .1em; font-size: 15px; }
-.slhead .slstart { height: 36px; padding: 0 12px; flex: none; }
-.btn:disabled { opacity: .35; cursor: default; }
-/* Start of a single piece: the same accent as Start of a setlist */
-.mini.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 14px; }
-.pieces { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.piece { display: flex; align-items: center; gap: 8px; }
-.piecebody {
-  flex: 1; min-width: 0; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
-  color: var(--fg); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;
-}
-.piecebody .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.piecebody .wname { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.piecebody .total { font: 13px var(--font-digits); color: var(--muted); flex: none; }
-.piecebody .durs { font: 13px var(--font-digits); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.strip { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; }
-.strip span { min-width: 3px; border-bottom: 3px solid; }
-.strip span.timer { min-width: 10px; }
-/* the ring that fills while the right pedal is held on a timer: full = next section */
-#hold { position: fixed; left: 50%; top: 50%; width: 38vmin; height: 38vmin; transform: translate(-50%, -50%) rotate(-90deg); z-index: 15; pointer-events: none; }
-#hold circle { fill: none; stroke: var(--seg-ink); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: 276.5; opacity: .85; }
-#hold.fill circle { stroke-dashoffset: 0; transition: stroke-dashoffset 2s linear; }
-.slfoot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
-.slfoot div { display: flex; gap: 8px; }
-.empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
-.libfoot { display: flex; gap: 10px; padding-top: 6px; flex: none; }
-.libfoot .btn { flex: 1; height: 48px; }
-
-/* ---- Editor ---- */
-.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-.field > label, .lbl { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.segs { display: flex; flex-direction: column; gap: 10px; }
-.seg { border-radius: 12px; border: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.segtop { display: flex; align-items: center; gap: 8px; }
-.segnum { font: 600 13px var(--font-digits); width: 28px; flex: none; }
-.dur { display: flex; align-items: center; gap: 4px; flex: 1; }
-.dur input {
-  width: 3.4ch; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
-  color: inherit; text-align: center; font: 400 24px var(--font-digits); padding: 2px 0;
-}
-.dur b { font: 400 24px var(--font-digits); }
-.tnote { font-size: 13px; opacity: .8; }
-.segcol { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pick { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); overflow: hidden; flex: none; }
-.pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
-.pick span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 10px var(--font-ui); letter-spacing: .06em; pointer-events: none; }
-.pairs { display: flex; gap: 6px; flex-wrap: wrap; }
-.pair { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); padding: 0; }
-.addseg { margin-top: 12px; width: 100%; height: 48px; }
-.addseg + .addseg { margin-top: 8px; }
-.radio { display: flex; gap: 8px; }
-.radio button { flex: 1; }
-.radio button[aria-checked="true"] { border-color: var(--accent); color: var(--accent); }
-.edfoot { display: flex; gap: 10px; padding-top: 6px; flex: none; flex-wrap: wrap; }
-.edfoot .btn { flex: 1; height: 48px; }
-
-/* ---- Player (Élan layout) ---- */
-#player { background: var(--seg-bg); color: var(--seg-ink); padding-block: 10px; transition: background .15s; }
-#player .iconbtn, #player .phase { color: color-mix(in srgb, var(--seg-ink) 65%, transparent); border-color: color-mix(in srgb, var(--seg-ink) 25%, transparent); }
-#player .iconbtn[aria-pressed="true"] { color: var(--seg-ink); border-color: color-mix(in srgb, var(--seg-ink) 65%, transparent); }
-.phase { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
-.phase span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.phase i { width: 9px; height: 9px; border-radius: 50%; background: var(--seg-fg); flex: none; box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-ink) 30%, transparent); }
-.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-.fit { flex: 1; min-height: 0; width: 100%; position: relative; overflow: hidden; }
-#digits { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-#player.paused #digits { opacity: .45; }
-.psetup { width: 100%; max-width: 560px; }
-.psetup .mid { display: flex; flex-direction: column; gap: 6px; text-align: center; }
-.psetup .durs { font: 13px var(--font-digits); opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* title of the piece, as large as the box allows (size set by fitTitle) */
-.ttl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-/* upright sans serif: from a distance it reads better than an italic */
-#ttl { font: 600 40px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--seg-fg); text-align: center; line-height: 1.1;
-       overflow-wrap: normal; word-break: normal; width: 96%; padding: 0 .1em; }
-#ttl.blink { animation: tblink .32s steps(1, end) 5; }
-@keyframes tblink { 0% { opacity: 0; } 50% { opacity: 1; } }
-#player[data-mode="title"] #digits, #player[data-mode="end"] #digits { display: none; }
-#player[data-mode="run"] .ttl, #player[data-mode="run"] .psetup,
-#player[data-mode="done"] .ttl, #player[data-mode="done"] .psetup { display: none; }
-#player[data-mode="end"] #ttl { color: var(--seg-ink); opacity: .55; }
-/* seek bar on the title screen */
-.scrub { position: relative; padding: 10px 0; touch-action: none; cursor: pointer; }
-.scrub .strip { height: 22px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-ink) 25%, transparent); }
-.scrub .past { position: absolute; left: 0; top: 10px; height: 22px; width: 0; background: rgba(0,0,0,.5); border-radius: 4px 0 0 4px; pointer-events: none; }
-.scrub .head { position: absolute; top: 4px; bottom: 4px; left: 0; width: 4px; margin-left: -2px; border-radius: 2px;
-               background: var(--seg-ink); box-shadow: 0 0 0 1px color-mix(in srgb, var(--seg-bg) 70%, transparent); pointer-events: none; }
-.seekrow { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.seekrow .mini { color: var(--seg-ink); border-color: color-mix(in srgb, var(--seg-ink) 30%, transparent); }
-#seekPos { font: 13px var(--font-digits); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#player[data-mode="end"] .scrub, #player[data-mode="end"] .seekrow { display: none; }
-.controls { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding-top: 10px; flex: none; }
-#player[data-mode="title"] .controls { grid-template-columns: 1fr 2fr 1fr; }
-#player:not([data-mode="title"]):not(.timer) #nextPiece { display: none; }
-/* on a timer, Next › moves on to the next section */
-#player.timer[data-mode="run"] .controls { grid-template-columns: 1fr 2fr 1fr; }
-/* a single piece: no previous or next on its title, Start only */
-#player[data-list="0"][data-mode="title"] .controls { grid-template-columns: 1fr; }
-#player[data-list="0"][data-mode="title"] #reset, #player[data-list="0"][data-mode="title"] #nextPiece { display: none; }
-#nextPiece { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
-.controls button:disabled { opacity: .35; cursor: default; }
-.controls button { height: 58px; border-radius: 10px; font: 600 17px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
-#reset { background: color-mix(in srgb, var(--seg-ink) 10%, var(--seg-bg)); border: 1px solid color-mix(in srgb, var(--seg-ink) 25%, transparent); color: var(--seg-ink); }
-#main { background: var(--seg-fg); border: none; color: var(--seg-bg); }
-#player.paused #main { background: var(--seg-ink); color: var(--seg-bg); }
-#player.immersive { padding-block: 0; }
-#player.immersive .top, #player.immersive .controls { display: none; }
-.hint {
-  position: fixed; left: 0; right: 0; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  text-align: center; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; pointer-events: none;
-}
-
-/* ---- Dialogs ---- */
-.dialog {
-  position: fixed; inset: 0; z-index: 20; display: flex; overflow-y: auto;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
-}
-.card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; color: var(--fg);
-  padding: 24px; max-width: 360px; width: 100%; margin: auto; display: flex; flex-direction: column; gap: 14px;
-}
-.card h2 { margin: 0; font: italic 400 36px Georgia, "Times New Roman", serif; color: var(--accent); }
-.card p { margin: 0; font-size: 15px; line-height: 1.5; }
-.card a { color: var(--run); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--run) 40%, transparent); }
-.card h3 { margin: 6px 0 -6px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.card hr { border: none; border-top: 1px solid var(--line); margin: 4px 0 0; width: 100%; }
-.card .ver { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: -8px; }
-.card .btn { align-self: flex-end; }
-.toast {
-  position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30;
-  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: 90vw; text-align: center;
-}
-
-@media (orientation: landscape) and (max-height: 520px) {
-  .controls button { height: 46px; }
-  .psetup .mini { width: 38px; height: 38px; }
-}
-</style></head><body>
-
-<!-- ================= Library ================= -->
-<section class="view" id="library">
-  <div class="top">
-    <h1 class="title">Relais</h1>
-    <div class="tools">
-      <button class="iconbtn" id="importBtn">Import</button>
-      <button class="iconbtn" id="exportAll">Export</button>
-      <button class="iconbtn info" id="infoBtn" aria-label="About">i</button>
-    </div>
-  </div>
-  <div class="scroll" id="libList"></div>
-  <div class="libfoot"><button class="btn" id="newSl">+ New setlist</button></div>
-  <input type="file" id="importFile" accept=".json,application/json" hidden>
-</section>
-
-<!-- ================= Editor ================= -->
-<section class="view" id="editor" hidden>
-  <div class="top">
-    <button class="iconbtn" id="edBack">‹ Setlists</button>
-    <span class="small" id="edWhere"></span>
-  </div>
-  <div class="scroll">
-    <div class="field">
-      <label for="edName">Piece</label>
-      <input class="name" id="edName" maxlength="60" style="font-size:22px">
-    </div>
-    <div class="lbl" style="margin-bottom:8px">Sections <span id="edTotal" style="font-family:var(--font-digits);letter-spacing:0;text-transform:none"></span></div>
-    <div class="segs" id="segs"></div>
-    <button class="btn addseg" id="addSeg">+ Add countdown</button>
-    <button class="btn addseg" id="addTimer">+ Add timer</button>
-  </div>
-  <div class="edfoot">
-    <button class="btn danger" id="edDelete">Delete</button>
-    <button class="btn" id="edDup">Duplicate</button>
-    <button class="btn primary" id="edPlay">▶ Start</button>
-  </div>
-</section>
-
-<!-- ================= Player ================= -->
-<section class="view" id="player" hidden>
-  <div class="top">
-    <div class="phase"><i></i><span id="phaseLabel"></span></div>
-    <div class="tools">
-      <button class="iconbtn" id="plBack">Setlists</button>
-      <button class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound and vibration at each change">Sound</button>
-      <button class="iconbtn" id="full">Full screen</button>
-    </div>
-  </div>
-  <div class="stage" id="stage">
-    <div class="fit" id="fit">
-      <canvas id="digits" role="img" aria-label="00:00"></canvas>
-      <!-- title screen: the name of the piece, static until the pedal starts it -->
-      <div class="ttl" id="ttlBox"><div id="ttl" role="heading" aria-level="1"></div></div>
-    </div>
-    <div class="psetup" id="psetup">
-      <div class="mid">
-        <!-- seek bar: where the piece will start from, as in an audio player -->
-        <div class="scrub" id="scrub" role="slider" aria-label="Start position" aria-valuemin="0">
-          <div class="strip" id="plStrip"></div>
-          <div class="past" id="past"></div>
-          <div class="head" id="head"></div>
-        </div>
-        <div class="seekrow" id="seekrow">
-          <button class="mini" id="seekHome" aria-label="Back to the beginning">⏮</button>
-          <button class="mini" id="seekMinus" aria-label="One second earlier">−</button>
-          <span id="seekPos"></span>
-          <button class="mini" id="seekPlus" aria-label="One second later">+</button>
-        </div>
-        <div class="durs" id="plDurs"></div>
-      </div>
-    </div>
-  </div>
-  <div class="controls" id="controls">
-    <button id="reset">Reset</button>
-    <button id="main">Start</button>
-    <button id="nextPiece">Next ›</button>
-  </div>
-  <div class="hint" id="hint" hidden>Tap for controls</div>
-  <svg id="hold" hidden viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44"/></svg>
-</section>
-
-<div class="dialog" id="about" hidden role="dialog" aria-modal="true" aria-labelledby="abTitle">
-  <div class="card">
-    <h2 id="abTitle">Relais</h2>
-    <div class="ver">Version 0.6.0</div>
-    <p>Sequential sections, each with its own colours: a countdown hands over to the next section by itself at zero, a timer counts up until you move on.</p>
-    <h3>Pieces and setlists</h3>
-    <p>Tap a piece to edit its sections. ▶ next to a piece plays it alone: it stops at 00:00. <strong>▶ Start</strong> on a setlist plays it in order: each piece opens on its title, and when one ends the title of the next appears.</p>
-    <h3>Timers</h3>
-    <p><strong>+ Add timer</strong> adds a section of open length: it counts up from 0:00 until you move on. Hold the right pedal for 2 seconds, or tap <strong>Next ›</strong>, to go to the next section; a short press pauses and resumes.</p>
-    <h3>Starting from a point</h3>
-    <p>On the title, the coloured bar works like the progress bar of an audio player: tap or drag the head, or use − and +, to start from any point. Reset brings you back to the same point.</p>
-    <h3>Bluetooth pedal</h3>
-    <p>Pair a page-turner pedal in the Bluetooth settings of Android, as a keyboard. On a title, right starts the piece. On a countdown, right pauses and resumes, left resets to the title. On a timer, a short press of right pauses and resumes, holding it for 2 seconds moves on. On a title, left does nothing, so a stray press never changes the piece.</p>
-    <h3>Export and import</h3>
-    <p><strong>Export</strong> at the top saves all the setlists in one file; Export inside a setlist saves that one only. <strong>Import</strong> adds the setlists of a file to those already here, without replacing them. Use it to keep a copy, to move to another phone, or to load the setlists into the web version for ensembles. Export before uninstalling the app: its setlists are lost with it.</p>
-    <hr>
-    <p>Designed and built by Alessandro Ciccarelli.<br><a href="https://alessandrociccarelli.com" target="_blank" rel="noopener">alessandrociccarelli.com</a></p>
-    <p class="small">© 2026. Free software under the MIT License. Works offline and collects no data.</p>
-    <button class="btn" id="abClose">Close</button>
-  </div>
-</div>
-<div class="toast" id="toast" hidden></div>
-
-<script>
+/*
+ * Relais: the app itself (setlists, editor, player). The same file runs in the Android app
+ * (as an asset, see app/build.gradle.kts) and in the web version for ensembles, where it is the
+ * conductor's editor of setlists (web/app/, opened from director.html).
+ * Copyright (c) 2026 Elnath Project (Alessandro Ciccarelli)
+ * Released under the MIT License: see the LICENSE file.
+ */
 (() => {
   const $ = id => document.getElementById(id);
   const body = document.body;
+
+  // ---- conductor mode: in the web version this page is the conductor's editor of setlists ----
+  // director.html opens it with ?conductor, and the mode lasts for that browser tab. There ▶ and
+  // Start do not open the local player: they hand the piece over to the conductor's page, which
+  // sends its title to every display. Never in the Android app.
+  const CONDUCTOR = (() => {
+    if (window.Android) return false;
+    try {
+      if (new URLSearchParams(location.search).has('conductor')) sessionStorage.setItem('relais.conductor', '1');
+      return sessionStorage.getItem('relais.conductor') === '1';
+    } catch (e) { return false; }
+  })();
+  function handOver(f, asList) {
+    try { localStorage.setItem('relais.conductor.play', JSON.stringify({ li: lib.setlists.indexOf(f.l), i: f.i, list: !!asList, at: Date.now() })); } catch (e) {}
+    location.href = '../director.html';
+  }
 
   // ================= Data =================
   // library = { setlists: [ { id, name, pieces: [ { id, name, segments: [ section… ] } ] } ] }
@@ -658,6 +365,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   // The start position chosen on the title is P.seek = {k: section, ms: into it; 0 for a timer}.
   function openPlayer(id, asList) {
     const f = findPiece(id); if (!f) return;
+    if (CONDUCTOR) { handOver(f, asList); return; }
     P = { l: f.l, list: !!asList, seq: asList ? f.l.pieces : [f.w], i: asList ? f.i : 0,
           mode: 'title', base: 0, off: 0, startAt: 0, pausedAt: null, fresh: false, idx: 0, doneAt: 0 };
     pl.dataset.list = asList ? '1' : '0';
@@ -992,7 +700,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
   // the Android back button: player → library, editor → library
   window.relaisBack = () => { if (view === 'player') { $('plBack').click(); return true; } if (view === 'editor') { go('library'); return true; } return false; };
 
+  if (CONDUCTOR) {
+    $('toConductor').hidden = false;
+    $('toConductor').addEventListener('click', () => { location.href = '../director.html'; });
+  }
   go('library');
 })();
-</script>
-</body></html>

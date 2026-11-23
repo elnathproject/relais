@@ -27,9 +27,9 @@ Web hosting with PHP 7.4 or later, shared hosting included. No database: the sta
 
 ## Use
 
-- **Setlists.** Prepare them in the Relais app, tap *Export* at the top of the setlists, and import that file on the conductor's page with *Import setlists*. The page keeps them in that browser; importing again replaces them.
+- **Setlists.** On the conductor's page, *Setlists* opens the same editor as the Relais app: setlists, pieces, countdowns, timers and colours are created and edited there, and files exported from the app can be imported there. The editor keeps them in that browser. *‹ Conductor* goes back to the conductor's page; the ▶ of a piece and *▶ Start* of a setlist go back too and load that piece or setlist.
 - **Conductor:** open `director.html` (for example `https://yoursite.com/relais/director.html`) and enter the password. *Remember on this computer* keeps you logged in for 30 days; otherwise the session ends when the tab is closed, or after 12 hours. *Log out* ends it at once. Several devices can control the same timer.
-- **Starting.** *▶ Start* on a setlist sends the title of its first piece to every display; the ▶ of a single piece sends that piece alone. On a title, move the head of the seek bar (or step it with − and +) to start from a later point, then start with the pedal or *Start*. *‹ Prev* and *Next ›* change piece on a title.
+- **Starting.** In the editor, *▶ Start* on a setlist sends the title of its first piece to every display; the ▶ of a single piece sends that piece alone. On a title, move the head of the seek bar (or step it with − and +) to start from a later point, then start with the pedal or *Start*. *‹ Prev* and *Next ›* change piece on a title.
 - **Pedal or keyboard (conductor).** On a title, right or down arrow, Page Down, Space or Enter start the piece. On a countdown, the same keys pause and resume; left or up arrow, Page Up reset to the title of the piece, at the same start position. On a timer, a short press pauses and resumes, and holding the key for 2 seconds moves on to the next section on every display together. Left does nothing on a title, so a stray press on stage never changes the piece.
 - **Performers:** open the folder address (`https://yoursite.com/relais/`). On the conductor's page, *QR code* shows it as a large QR code to scan from the conductor's screen (with the ensemble code, if set); *Settings* shows it as text with a *Copy* button. One tap shows the timer full screen and keeps the screen on.
 - **Opening and closing:** the performers see the timer only while it is open. Logging in as conductor opens it; *Log out* closes it, and the displays go back to a waiting page that opens again by itself. If the conductor's page loses the connection (computer asleep, network down) the timer stays visible for two hours, then closes (`CLOSE_AFTER_MINUTES` in `config.php`). While closed, the server tells visitors nothing. *Clear the displays*, in Settings, sends them back to the waiting screen without closing.
@@ -57,7 +57,8 @@ The protections are those of Élan's web version, tested the same way.
 | :- | :- |
 | `api.php` | server: current piece, start position, run instants, conductor's login and sessions, block after wrong passwords, ensemble code |
 | `config.php` | password, ensemble code, limits, lead time of the commands |
-| `director.html`, `director.js` | conductor's page: setlists, player, seek bar, settings, QR code |
+| `director.html`, `director.js` | conductor's page: player, seek bar, settings, QR code |
+| `app/index.html`, `app/app.js` | the Relais app itself, also packaged in the APK; opened from the conductor's page as the setlist editor |
 | `index.html`, `display.js` | performers' display |
 | `timer.js` | code shared by the two pages: seven-segment digits, title, seek bar, clock offset, what to show at each instant |
 | `qrcode.js` | QR code generator by Kazuhiko Arase (qrcode-generator 2.0.4, MIT licence), used unchanged by the conductor's page |
