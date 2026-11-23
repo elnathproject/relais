@@ -1,0 +1,1 @@
+Web version for ensembles: the conductor's page now has the same setlist editor as the app. Setlists opens it; there you create and edit setlists, pieces, countdowns and timers, or import a file exported from the app, and the ▶ of a piece or Start of a setlist sends it to the displays. The app itself is unchanged.

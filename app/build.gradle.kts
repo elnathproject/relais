@@ -11,8 +11,8 @@ android {
         applicationId = "com.ciccarelli.relais"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.6.0"
+        versionCode = 6
+        versionName = "0.7.0"
     }
 
     // The interface of the app (index.html, app.js) lives in web/app/: the same files are the
